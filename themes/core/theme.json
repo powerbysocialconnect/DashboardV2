@@ -1,0 +1,23 @@
+{
+  "name": "CORE",
+  "version": "1.0.0",
+  "author": "PixeoCommerce",
+  "description": "High-end, minimalist startup theme inspired by DSN-Grid. The official baseline for Pixeo V2.",
+  "settings_schema": {
+    "colors": {
+      "primary": "#000000",
+      "background": "#FFFFFF",
+      "text": "#1A1A1A",
+      "accent": "#F5F5F5"
+    },
+    "typography": {
+      "heading": "Inter",
+      "body": "Inter"
+    }
+  },
+  "templates": {
+    "index": "templates/index.json",
+    "product": "templates/product.json",
+    "collection": "templates/collection.json"
+  }
+}

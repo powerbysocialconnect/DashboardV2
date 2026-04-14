@@ -1,0 +1,35 @@
+{
+  "name": "Homepage",
+  "sections": {
+    "header": {
+      "type": "header",
+      "settings": {
+        "logoText": "PIXEO",
+        "sticky": true
+      }
+    },
+    "hero": {
+      "type": "hero",
+      "settings": {
+        "heading": "Designing the Future of Commerce.",
+        "subheading": "A minimalist platform for high-end boutique stores and independent creators.",
+        "alignment": "left"
+      }
+    },
+    "featured": {
+      "type": "featured-products",
+      "settings": {
+        "title": "Selected Works",
+        "columns": 4,
+        "limit": 8
+      }
+    },
+    "footer": {
+      "type": "footer",
+      "settings": {
+        "brandStatement": "Crafting minimalist digital experiences for the next generation of commerce."
+      }
+    }
+  },
+  "order": ["header", "hero", "featured", "footer"]
+}

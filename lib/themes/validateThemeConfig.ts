@@ -129,6 +129,28 @@ function validateScalarField(
       return String(value);
     }
 
+    case "category": {
+      if (typeof value !== "string") {
+        errors.push({ path, message: `\"${field.label}\" must be a category id string` });
+        return undefined;
+      }
+      return value;
+    }
+
+    case "product_multi": {
+      if (!Array.isArray(value)) {
+        errors.push({ path, message: `\"${field.label}\" must be an array of product ids` });
+        return [];
+      }
+      const validIds = value
+        .filter((v) => typeof v === "string" && v.trim().length > 0)
+        .map((v) => String(v));
+      if (validIds.length !== value.length) {
+        errors.push({ path, message: `\"${field.label}\" contains invalid product ids` });
+      }
+      return validIds;
+    }
+
     case "repeater": {
       if (!Array.isArray(value)) {
         errors.push({ path, message: `"${field.label}" must be an array` });

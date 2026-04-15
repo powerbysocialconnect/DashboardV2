@@ -67,6 +67,10 @@ interface TemplateFormData {
   documentation_url: string;
   required_plans: string[];
   is_active: boolean;
+  blueprint_json: string;
+  package_manifest_json: string;
+  source_type: string;
+  package_status: string;
 }
 
 const EMPTY_FORM: TemplateFormData = {
@@ -86,6 +90,10 @@ const EMPTY_FORM: TemplateFormData = {
   documentation_url: "",
   required_plans: [],
   is_active: true,
+  blueprint_json: "{}",
+  package_manifest_json: "{}",
+  source_type: "manual",
+  package_status: "manual",
 };
 
 const THEME_CODES = ["starter", "premium", "pro", "maintenance", "store", "custom"];
@@ -103,6 +111,9 @@ export default function TemplatesPage() {
   const [formData, setFormData] = useState<TemplateFormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [ingestingBundle, setIngestingBundle] = useState(false);
+  const [bundleError, setBundleError] = useState<string | null>(null);
+  const [bundleSuccess, setBundleSuccess] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -190,6 +201,10 @@ export default function TemplatesPage() {
       documentation_url: template.documentation_url || "",
       required_plans: template.required_plans || [],
       is_active: template.is_active,
+      blueprint_json: JSON.stringify(template.blueprint || {}, null, 2),
+      package_manifest_json: JSON.stringify(template.package_manifest || {}, null, 2),
+      source_type: template.source_type || "manual",
+      package_status: template.package_status || "manual",
     });
     setDialogOpen(true);
   }
@@ -222,16 +237,87 @@ export default function TemplatesPage() {
     }
   }
 
+  async function handleBundleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setBundleError(null);
+    setBundleSuccess(null);
+    setIngestingBundle(true);
+    try {
+      const fd = new FormData();
+      fd.append("themePackage", file);
+
+      const res = await fetch("/api/admin/templates/ingest", {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Theme package ingestion failed");
+      }
+
+      const metadata = data.metadata || {};
+      const schema = data.schema || {};
+      const blueprint = data.blueprint || {};
+      const assets = data.assets || {};
+
+      setFormData((prev) => ({
+        ...prev,
+        name: metadata.name || prev.name,
+        description: metadata.description || prev.description,
+        theme_code: metadata.themeCode || prev.theme_code,
+        version: metadata.version || prev.version,
+        category: metadata.category || prev.category,
+        repository_url: metadata.repositoryUrl || prev.repository_url,
+        documentation_url: metadata.documentationUrl || prev.documentation_url,
+        preview_url: metadata.previewUrl || prev.preview_url,
+        thumbnail_url: assets.previewUrl || prev.thumbnail_url,
+        bundle_url: assets.bundleUrl || prev.bundle_url,
+        style_url: assets.styleUrl || prev.style_url,
+        config_schema_json: JSON.stringify(schema, null, 2),
+        blueprint_json: JSON.stringify(blueprint || {}, null, 2),
+        package_manifest_json: JSON.stringify(
+          {
+            packageHash: data.packageHash,
+            packageFiles: data.packageFiles,
+            assets: assets.assetUrls || [],
+            packageVersion: metadata.packageVersion,
+          },
+          null,
+          2
+        ),
+        source_type: "zip_upload",
+        package_status: data.duplicate ? "validated" : "validated",
+      }));
+
+      setBundleSuccess(
+        data.duplicate
+          ? "Identical package detected and metadata loaded for review."
+          : "Theme package ingested. Metadata and schema auto-populated."
+      );
+    } catch (err) {
+      setBundleError(err instanceof Error ? err.message : "Theme ingestion failed");
+    } finally {
+      setIngestingBundle(false);
+      e.currentTarget.value = "";
+    }
+  }
+
   async function handleSave() {
     setSaving(true);
     try {
       let config = [];
       let schema = {};
+      let blueprint = {};
+      let packageManifest = {};
       try {
         config = JSON.parse(formData.config_json);
         schema = JSON.parse(formData.config_schema_json);
+        blueprint = JSON.parse(formData.blueprint_json || "{}");
+        packageManifest = JSON.parse(formData.package_manifest_json || "{}");
       } catch (e) {
-        throw new Error("Invalid JSON in Config or Schema fields");
+        throw new Error("Invalid JSON in config/schema/blueprint/manifest fields");
       }
 
       const payload = {
@@ -248,6 +334,10 @@ export default function TemplatesPage() {
         category: formData.category || null,
         config: config,
         config_schema: schema,
+        blueprint: blueprint,
+        package_manifest: packageManifest,
+        source_type: formData.source_type || "manual",
+        package_status: formData.package_status || "manual",
         documentation_url: formData.documentation_url || null,
         required_plans: formData.required_plans.length > 0 ? formData.required_plans : null,
         is_active: formData.is_active,
@@ -259,6 +349,38 @@ export default function TemplatesPage() {
           .update(payload)
           .eq("id", editingTemplate.id);
         if (updateError) throw updateError;
+
+        const templateId = editingTemplate.id;
+        const packageHash = (packageManifest as Record<string, unknown>).packageHash as string | undefined;
+        if (formData.source_type === "zip_upload" && packageHash) {
+          const { data: versionRow, error: versionError } = await supabase
+            .from("headless_template_versions")
+            .upsert(
+              {
+                template_id: templateId,
+                theme_code: formData.theme_code,
+                version: formData.version,
+                package_hash: packageHash,
+                source_type: "zip_upload",
+                package_manifest: packageManifest,
+                schema_json: schema,
+                blueprint_json: blueprint,
+                bundle_url: formData.bundle_url || null,
+                style_url: formData.style_url || null,
+                preview_url: formData.thumbnail_url || null,
+                status: "validated",
+              },
+              { onConflict: "theme_code,version" }
+            )
+            .select("id")
+            .single();
+          if (!versionError && versionRow?.id) {
+            await supabase
+              .from("headless_templates")
+              .update({ current_version_id: versionRow.id })
+              .eq("id", templateId);
+          }
+        }
 
         setTemplates((prev) =>
           prev.map((t) =>
@@ -272,6 +394,38 @@ export default function TemplatesPage() {
           .select("*")
           .single();
         if (insertError) throw insertError;
+
+        const packageHash = (packageManifest as Record<string, unknown>).packageHash as string | undefined;
+        if (formData.source_type === "zip_upload" && packageHash) {
+          const { data: versionRow, error: versionError } = await supabase
+            .from("headless_template_versions")
+            .upsert(
+              {
+                template_id: data.id,
+                theme_code: formData.theme_code,
+                version: formData.version,
+                package_hash: packageHash,
+                source_type: "zip_upload",
+                package_manifest: packageManifest,
+                schema_json: schema,
+                blueprint_json: blueprint,
+                bundle_url: formData.bundle_url || null,
+                style_url: formData.style_url || null,
+                preview_url: formData.thumbnail_url || null,
+                status: "validated",
+              },
+              { onConflict: "theme_code,version" }
+            )
+            .select("id")
+            .single();
+          if (!versionError && versionRow?.id) {
+            await supabase
+              .from("headless_templates")
+              .update({ current_version_id: versionRow.id })
+              .eq("id", data.id);
+          }
+        }
+
         setTemplates((prev) => [data, ...prev]);
       }
 
@@ -748,7 +902,14 @@ export default function TemplatesPage() {
               </TabsContent>
 
               <TabsContent value="bundle" className="space-y-6 mt-0 outline-none pt-2">
-                <div className="p-10 rounded-2xl border-2 border-dashed border-muted-foreground/20 bg-muted/10 flex flex-col items-center justify-center text-center transition-all hover:bg-primary/5 hover:border-primary/40 group cursor-pointer">
+                <div className="relative p-10 rounded-2xl border-2 border-dashed border-muted-foreground/20 bg-muted/10 flex flex-col items-center justify-center text-center transition-all hover:bg-primary/5 hover:border-primary/40 group cursor-pointer">
+                  <input
+                    type="file"
+                    accept=".zip,application/zip"
+                    onChange={handleBundleUpload}
+                    className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+                    disabled={ingestingBundle}
+                  />
                   <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-4 transition-transform group-hover:scale-110">
                     <Upload className="h-8 w-8" />
                   </div>
@@ -757,9 +918,21 @@ export default function TemplatesPage() {
                     Select your compiled V2 SDK package. This will automatically sync your sections, assets and schema.
                   </p>
                   <div className="mt-8">
-                     <Button variant="outline" className="h-10 font-bold bg-white shadow-sm">Select File</Button>
+                     <Button variant="outline" className="h-10 font-bold bg-white shadow-sm" disabled={ingestingBundle}>
+                       {ingestingBundle ? "Ingesting..." : "Select File"}
+                     </Button>
                   </div>
                 </div>
+                {bundleError && (
+                  <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                    {bundleError}
+                  </div>
+                )}
+                {bundleSuccess && (
+                  <div className="rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-700">
+                    {bundleSuccess}
+                  </div>
+                )}
                 
                 <div className="space-y-2">
                   <label className="text-sm font-semibold flex items-center gap-2">
@@ -822,6 +995,28 @@ export default function TemplatesPage() {
                 <div>
                    <label className="text-sm font-semibold flex items-center gap-2 mb-2"><Globe className="h-4 w-4" /> Documentation Portal</label>
                    <Input value={formData.documentation_url} onChange={(e) => setFormData({ ...formData, documentation_url: e.target.value })} placeholder="https://docs.yoursite.com/themes" className="h-11 shadow-sm" />
+                </div>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Blueprint JSON</label>
+                    <Textarea
+                      value={formData.blueprint_json}
+                      onChange={(e) => setFormData({ ...formData, blueprint_json: e.target.value })}
+                      placeholder="{}"
+                      className="font-mono text-xs"
+                      rows={6}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Package Manifest JSON</label>
+                    <Textarea
+                      value={formData.package_manifest_json}
+                      onChange={(e) => setFormData({ ...formData, package_manifest_json: e.target.value })}
+                      placeholder="{}"
+                      className="font-mono text-xs"
+                      rows={6}
+                    />
+                  </div>
                 </div>
               </TabsContent>
             </div>

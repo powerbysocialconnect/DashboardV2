@@ -33,7 +33,7 @@ export async function resolveStorefront(
       .eq("store_id", config.store.id)
       .eq("active", true)
       .order("created_at", { ascending: false })
-      .limit(12),
+      .limit(200),
     supabase
       .from("categories")
       .select("id, name, slug")

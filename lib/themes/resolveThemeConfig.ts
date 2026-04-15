@@ -22,7 +22,7 @@ import type {
 // ─── Build complete default config from a theme schema ──────────────────────
 
 function resolveFieldDefault(field: ThemeFieldDefinition): unknown {
-  if (field.type === "repeater") {
+  if (field.type === "repeater" || field.type === "product_multi") {
     return field.defaultValue ?? [];
   }
   if (field.type === "boolean") {

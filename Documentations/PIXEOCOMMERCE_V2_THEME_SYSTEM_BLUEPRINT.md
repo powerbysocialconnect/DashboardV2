@@ -2,6 +2,9 @@
 
 This document defines the production-grade architecture for the PixeoCommerce **Schema-Driven Theme Ecosystem**. It covers the code-first development model, the admin field editor system, validation, the **Theme SDK roadmap** for partner developers, and everything an AI or developer needs to create new themes rapidly.
 
+For a simplified, implementation-first guide to the fixed-layout managed editor direction, use:
+`Documentations/PIXEOCOMMERCE_MANAGED_THEME_EDITOR_PLAYBOOK.md`
+
 ---
 
 ## 0. North Star: A Shopify-Like Theme Ecosystem
@@ -678,6 +681,32 @@ export const myTheme: ThemeDefinition = {
   ],
 };
 ```
+
+### 17.10. Product Sections Must Be Editor-Driven (Not Hardcoded)
+
+For sections like **Featured Products** / **Latest Products**, selection logic should be configured in the schema editor, not hardcoded in theme components.
+
+**Why:** merchants in Pixeo mostly add products; admins should control merchandising behavior per store without code changes.
+
+**Required pattern for product sections:**
+- `sourceType` (`latest` | `category` | `manual`)
+- `categoryId` (used by `category`, optional filter for `manual`)
+- `productIds` (manual product picks, ordered)
+- `sortBy` (`newest`, `oldest`, `price_asc`, `price_desc`, `name_asc`)
+- `limit`
+
+**Implementation rule:**
+- Theme component renders from resolved section config.
+- Storefront resolver applies source/filter/sort/limit based on saved section values.
+- Theme file only defines defaults/fallbacks; business behavior is editor-configurable.
+
+### 17.11. Editor UX Rule for Product Picking
+
+To keep the editor clean and non-confusing:
+- Show `categoryId` only when source is `category` or `manual`.
+- Show `productIds` only when source is `manual`.
+- When `categoryId` is selected in manual mode, product picker should list products from that category first (or only, depending on UX choice).
+- Preserve manual selection order in saved config.
 
 ---
 

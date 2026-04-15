@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { toast } from "sonner";
 import { useParams, useRouter } from "next/navigation";
-import { ThemeSectionsEditor } from "@/components/admin/theme-sections/ThemeSectionsEditor";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { StoreStatusBadge } from "@/components/admin/StoreStatusBadge";
 import { OnboardingChecklist } from "@/components/admin/OnboardingChecklist";
+import { StoreThemeEditorTab } from "@/components/admin/StoreThemeEditorTab";
 import { publishStore, disableStore, enableStore } from "@/lib/stores/publishStore";
 import { PLANS } from "@/lib/billing/plans";
 import { completeOnboardingTask, getOnboardingTasks } from "@/lib/stores/onboarding";
@@ -100,7 +101,6 @@ import {
   ExternalLink,
   FileText,
   Settings,
-  LayoutTemplate,
   Facebook,
   Instagram,
   Youtube,
@@ -279,31 +279,26 @@ export default function StoreDetailPage() {
     if (!store || !currentUserId) return;
     setActionLoading(true);
     try {
-      const { error: applyError } = await supabase
-        .from("store_theme_configs")
-        .insert({
-          store_id: store.id,
-          theme_code: template.theme_code,
-          theme_settings: template.config || {},
-          homepage_layout: [
-            { type: "hero", title: `Welcome to ${store.name}`, body: "Start your shopping experience here." },
-            { type: "featured_products", title: "Recently Added", limit: 4 }
-          ]
-        });
-
-      if (applyError) throw applyError;
-
-      await logStoreAction(supabase, {
-        store_id: store.id,
-        action: "theme_applied",
-        details: { theme_code: template.theme_code, template_id: template.id },
-        performed_by: currentUserId,
+      const res = await fetch(`/api/admin/stores/${storeId}/apply-theme`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          themeCode: template.theme_code,
+          themeSettings: template.config || {},
+          storeName: store.name
+        }),
       });
 
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to apply theme");
+      }
+
+      toast.success(`Theme "${template.name}" applied successfully!`);
       await fetchStore();
     } catch (err) {
       console.error("Apply theme failed:", err);
-      alert(err instanceof Error ? err.message : "Failed to apply theme");
+      toast.error(err instanceof Error ? err.message : "Failed to apply theme");
     } finally {
       setActionLoading(false);
     }
@@ -706,30 +701,48 @@ export default function StoreDetailPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="overview" className="gap-1.5">
+        <TabsList className="w-full justify-start gap-6 bg-transparent h-auto p-0 border-b rounded-none pb-px overflow-x-auto">
+          <TabsTrigger
+            value="overview"
+            className="gap-2 whitespace-nowrap data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-3 font-semibold text-sm transition-all hover:text-primary"
+          >
             <Globe className="h-4 w-4" />
-            <span className="hidden sm:inline">Overview</span>
+            <span>Overview</span>
           </TabsTrigger>
-          <TabsTrigger value="theme" className="gap-1.5">
+          <TabsTrigger
+            value="theme"
+            className="gap-2 whitespace-nowrap data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-3 font-semibold text-sm transition-all hover:text-primary"
+          >
             <Palette className="h-4 w-4" />
-            <span className="hidden sm:inline">Theme</span>
+            <span>Theme</span>
           </TabsTrigger>
-          <TabsTrigger value="sections" className="gap-1.5">
-            <LayoutTemplate className="h-4 w-4" />
-            <span className="hidden sm:inline">Sections</span>
+          <TabsTrigger
+            value="editor"
+            className="gap-2 whitespace-nowrap data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-3 font-semibold text-sm transition-all hover:text-primary"
+          >
+            <Pencil className="h-4 w-4" />
+            <span>Editor</span>
           </TabsTrigger>
-          <TabsTrigger value="settings" className="gap-1.5">
+          <TabsTrigger
+            value="settings"
+            className="gap-2 whitespace-nowrap data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-3 font-semibold text-sm transition-all hover:text-primary"
+          >
             <Settings className="h-4 w-4" />
-            <span className="hidden sm:inline">Settings</span>
+            <span>Settings</span>
           </TabsTrigger>
-          <TabsTrigger value="actions" className="gap-1.5">
+          <TabsTrigger
+            value="actions"
+            className="gap-2 whitespace-nowrap data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-3 font-semibold text-sm transition-all hover:text-primary"
+          >
             <Zap className="h-4 w-4" />
-            <span className="hidden sm:inline">Actions</span>
+            <span>Actions</span>
           </TabsTrigger>
-          <TabsTrigger value="history" className="gap-1.5">
+          <TabsTrigger
+            value="history"
+            className="gap-2 whitespace-nowrap data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-3 font-semibold text-sm transition-all hover:text-primary"
+          >
             <History className="h-4 w-4" />
-            <span className="hidden sm:inline">History</span>
+            <span>History</span>
           </TabsTrigger>
         </TabsList>
 
@@ -1344,25 +1357,8 @@ export default function StoreDetailPage() {
           )}
         </TabsContent>
 
-        {/* ========== SECTIONS TAB ========== */}
-        <TabsContent value="sections" className="space-y-6">
-          {themeConfig ? (
-            <ThemeSectionsEditor
-              storeId={storeId}
-              homepageLayout={themeConfig.homepage_layout || []}
-              themeCode={themeConfig.theme_code}
-            />
-          ) : (
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                <LayoutTemplate className="mb-4 h-10 w-10 text-muted-foreground/30" />
-                <h3 className="text-lg font-semibold">No Theme Assigned</h3>
-                <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-                  Assign a theme to this store first via the Theme tab, then come back here to customize section content.
-                </p>
-              </CardContent>
-            </Card>
-          )}
+        <TabsContent value="editor" className="space-y-6">
+          <StoreThemeEditorTab storeId={storeId} />
         </TabsContent>
 
         {/* ========== SETTINGS TAB ========== */}

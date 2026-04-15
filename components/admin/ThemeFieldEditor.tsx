@@ -28,10 +28,16 @@ function FieldInput({
   field,
   value,
   onChange,
+  categories = [],
+  products = [],
+  contextValues = {},
 }: {
   field: ThemeFieldDefinition | ThemeTokenDefinition;
   value: unknown;
   onChange: (val: unknown) => void;
+  categories?: { id: string; name: string }[];
+  products?: { id: string; name: string; category_id?: string | null }[];
+  contextValues?: Record<string, unknown>;
 }) {
   const fieldType = field.type;
   const placeholder =
@@ -109,11 +115,111 @@ function FieldInput({
         />
       );
 
-    case "select": {
-      const opts = "options" in field ? (field as ThemeFieldDefinition).options ?? [] : [];
+    case "category": {
+      const safe = value ? String(value) : "__all__";
       return (
         <Select
-          value={String(value ?? "")}
+          value={safe}
+          onValueChange={(v) => onChange(v === "__all__" ? undefined : v)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select Category…" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">All Products (No Filter)</SelectItem>
+            {categories.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+
+    case "product_multi": {
+      const selectedIds = Array.isArray(value) ? (value as string[]) : [];
+      const selectedSet = new Set(selectedIds);
+      const safe = "__pick__";
+      const selectedCategoryId = (contextValues.categoryId as string | undefined) || undefined;
+
+      const availableProducts = selectedCategoryId
+        ? products.filter((p) => p.category_id === selectedCategoryId)
+        : products;
+
+      const selectedProducts = selectedIds
+        .map((id) => products.find((p) => p.id === id))
+        .filter(Boolean) as { id: string; name: string }[];
+
+      return (
+        <div className="space-y-2">
+          <Select
+            value={safe}
+            onValueChange={(v) => {
+              if (v === "__pick__") return;
+              if (!selectedSet.has(v)) {
+                onChange([...selectedIds, v]);
+              }
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Add product…" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__pick__">Select product to add…</SelectItem>
+              {availableProducts
+                .filter((p) => !selectedSet.has(p.id))
+                .map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+          {selectedCategoryId && (
+            <p className="text-[11px] text-muted-foreground">
+              Showing products from selected category only.
+            </p>
+          )}
+
+          {selectedProducts.length > 0 ? (
+            <div className="space-y-1">
+              {selectedProducts.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between rounded border bg-muted/30 px-2 py-1"
+                >
+                  <span className="text-xs">{p.name}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => onChange(selectedIds.filter((id) => id !== p.id))}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">No manual products selected.</p>
+          )}
+        </div>
+      );
+    }
+
+    case "select": {
+      const rawOpts =
+        "options" in field ? (field as ThemeFieldDefinition).options ?? [] : [];
+      // Radix SelectItem forbids empty-string values. Filter defensively so a bad schema
+      // can't crash the admin UI.
+      const opts = rawOpts.filter((o) => o.value !== "");
+      const current = String(value ?? "");
+      const allowed = new Set(opts.map((o) => o.value));
+      const safeValue = current !== "" && allowed.has(current) ? current : "";
+      return (
+        <Select
+          value={safeValue}
           onValueChange={(v) => onChange(v)}
         >
           <SelectTrigger>
@@ -180,6 +286,8 @@ function FieldInput({
                   <FieldInput
                     field={sub}
                     value={item[sub.key]}
+                    categories={categories}
+                    products={products}
                     onChange={(v) => updateItem(idx, sub.key, v)}
                   />
                 </div>
@@ -212,10 +320,14 @@ export function TokenFieldGroup({
   tokens,
   values,
   onChange,
+  categories = [],
+  products = [],
 }: {
   tokens: ThemeTokenDefinition[];
   values: Record<string, unknown>;
   onChange: (key: string, value: unknown) => void;
+  categories?: { id: string; name: string }[];
+  products?: { id: string; name: string; category_id?: string | null }[];
 }) {
   return (
     <div className="space-y-4">
@@ -228,6 +340,9 @@ export function TokenFieldGroup({
           <FieldInput
             field={token}
             value={values[token.key] ?? token.defaultValue}
+            categories={categories}
+            products={products}
+            contextValues={values}
             onChange={(v) => onChange(token.key, v)}
           />
         </div>
@@ -243,13 +358,24 @@ export function SectionFieldGroup({
   section,
   values,
   onChange,
+  categories = [],
+  products = [],
 }: {
   section: ThemeSectionDefinition;
   values: Record<string, unknown>;
   onChange: (key: string, value: unknown) => void;
+  categories?: { id: string; name: string }[];
+  products?: { id: string; name: string; category_id?: string | null }[];
 }) {
   const showToggle = section.supportsToggle !== false;
   const isEnabled = values.enabled !== undefined ? Boolean(values.enabled) : (section.defaultEnabled !== false);
+  const sourceType = (values.sourceType as string | undefined) || "latest";
+
+  function shouldRenderField(fieldKey: string): boolean {
+    if (fieldKey === "categoryId") return sourceType === "category" || sourceType === "manual";
+    if (fieldKey === "productIds") return sourceType === "manual";
+    return true;
+  }
 
   return (
     <div className="space-y-4">
@@ -271,7 +397,7 @@ export function SectionFieldGroup({
       )}
 
       <div className={showToggle && !isEnabled ? "opacity-40 pointer-events-none" : ""}>
-        {section.fields.map((field) => (
+        {section.fields.filter((field) => shouldRenderField(field.key)).map((field) => (
           <div key={field.key} className="space-y-1.5 mb-4">
             <Label className="text-sm font-medium">{field.label}</Label>
             {field.helpText && (
@@ -280,6 +406,9 @@ export function SectionFieldGroup({
             <FieldInput
               field={field}
               value={values[field.key] ?? field.defaultValue}
+              categories={categories}
+              products={products}
+              contextValues={values}
               onChange={(v) => onChange(field.key, v)}
             />
           </div>

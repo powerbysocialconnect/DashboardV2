@@ -1,117 +1,81 @@
-import type { HomepageSection, Product, ThemeSettings, StoreSectionOverride } from "@/types/database";
-import HeroSection from "./HeroSection";
-import FeaturedProducts from "./FeaturedProducts";
-import CategoryGrid from "./CategoryGrid";
-import ImageWithText from "./ImageWithText";
-import Testimonials from "./Testimonials";
-import Newsletter from "./Newsletter";
-import RichText from "./RichText";
-// V2 CORE Theme Sections
-import CoreFeaturedProducts from "../../../themes/core/sections/featured-products";
-import { mergeSectionData, mergedToHomepageSection } from "@/lib/themes/mergeSectionData";
+"use client";
 
-interface SectionRendererProps {
-  section: HomepageSection;
-  settings: ThemeSettings;
-  products: Product[];
-  themeCode?: string;
-  sectionClassName?: string;
-  heroTitleClassName?: string;
-  heroSubtitleClassName?: string;
-  /** Store-specific override for this section (already looked up by caller) */
-  sectionOverride?: StoreSectionOverride | null;
-}
+import React from 'react';
+import { Hero } from './Hero';
+import { FeaturedProducts } from './FeaturedProducts';
 
-export default function SectionRenderer({
-  section,
-  settings,
-  products,
-  themeCode,
-  sectionClassName,
-  heroTitleClassName,
-  heroSubtitleClassName,
-  sectionOverride,
-}: SectionRendererProps) {
-  // Apply store-specific override if present
-  const merged = mergeSectionData(section, sectionOverride);
+export function ThemeSectionRenderer({ 
+  section, 
+  products, 
+  currency, 
+  subdomain 
+}: any) {
+  const isEnabled = section.enabled !== false;
+  
+  if (!isEnabled) return null;
 
-  // If the store has disabled this section, skip rendering
-  if (!merged.isEnabled) {
-    return null;
-  }
+  switch (section.type) {
+    case 'hero':
+      return <Hero settings={section} subdomain={subdomain} />;
+    
+    case 'featured_products':
+      return (
+        <FeaturedProducts 
+          settings={section} 
+          products={products} 
+          currency={currency} 
+          subdomain={subdomain} 
+        />
+      );
 
-  // Convert merged data back to HomepageSection shape for existing components
-  const effectiveSection = mergedToHomepageSection(merged);
+    case 'brand_statement':
+      return (
+        <section className="bg-white py-24 md:py-32 border-b border-black/[0.05]">
+          <div className="max-w-4xl mx-auto px-6 text-center">
+             <h2 className="text-2xl md:text-4xl font-black uppercase tracking-tighter leading-tight mb-8">
+               {section.heading}
+             </h2>
+             <p className="text-[16px] md:text-[18px] text-gray-500 leading-relaxed font-normal">
+               {section.body}
+             </p>
+          </div>
+        </section>
+      );
 
-  const isCore = themeCode === "core";
+    case 'newsletter':
+      return (
+        <section 
+          className="py-24 md:py-32"
+          style={{ 
+            backgroundColor: section.backgroundColor || '#1A1A1A',
+            color: section.textColor || '#FFFFFF'
+          }}
+        >
+          <div className="max-w-2xl mx-auto px-6 text-center">
+             <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter mb-6">
+                {section.heading || "STAY IN TOUCH"}
+             </h2>
+             <p className="text-white/60 mb-10 text-[14px] uppercase font-bold tracking-widest">
+                {section.subheading}
+             </p>
+             <form className="flex flex-col sm:flex-row gap-4">
+                <input 
+                  type="email" 
+                  placeholder="YOUR@EMAIL.COM" 
+                  className="flex-1 h-14 bg-white/5 border border-white/20 px-6 text-[12px] font-bold uppercase tracking-widest focus:outline-none focus:border-white transition-colors"
+                />
+                <button 
+                  className="h-14 px-10 bg-white text-black text-[12px] font-bold uppercase tracking-[0.2em] hover:bg-black hover:text-white transition-colors"
+                >
+                  {section.buttonLabel || "SUBSCRIBE"}
+                </button>
+             </form>
+          </div>
+        </section>
+      );
 
-  switch (effectiveSection.type) {
-    case "hero":
-      if (isCore) {
-        return null; // The premium reference site skips the hero entirely to focus on products.
-      }
-      return (
-        <HeroSection
-          section={effectiveSection}
-          settings={settings}
-          className={sectionClassName}
-          titleClassName={heroTitleClassName}
-          subtitleClassName={heroSubtitleClassName}
-        />
-      );
-    case "featured_products":
-      if (isCore) {
-        return <CoreFeaturedProducts.component settings={effectiveSection as any} products={products} />;
-      }
-      return (
-        <FeaturedProducts
-          section={effectiveSection}
-          settings={settings}
-          products={products}
-          className={sectionClassName}
-        />
-      );
-    case "category_grid":
-      return (
-        <CategoryGrid
-          section={effectiveSection}
-          settings={settings}
-          className={sectionClassName}
-        />
-      );
-    case "image_with_text":
-      return (
-        <ImageWithText
-          section={effectiveSection}
-          settings={settings}
-          className={sectionClassName}
-        />
-      );
-    case "testimonials":
-      return (
-        <Testimonials
-          section={effectiveSection}
-          settings={settings}
-          className={sectionClassName}
-        />
-      );
-    case "newsletter":
-      return (
-        <Newsletter
-          section={effectiveSection}
-          settings={settings}
-          className={sectionClassName}
-        />
-      );
-    case "rich_text":
-      return (
-        <RichText
-          section={effectiveSection}
-          settings={settings}
-          className={sectionClassName}
-        />
-      );
     default:
+      console.warn(`Unknown section type: ${section.type}`);
       return null;
   }
 }

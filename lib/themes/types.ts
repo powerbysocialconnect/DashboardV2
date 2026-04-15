@@ -23,6 +23,8 @@ export type ThemeFieldType =
   | "number"
   | "select"
   | "color"
+  | "category"
+  | "product_multi"
   | "repeater";
 
 export interface ThemeFieldOption {

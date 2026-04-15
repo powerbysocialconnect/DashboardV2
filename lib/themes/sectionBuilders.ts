@@ -289,6 +289,39 @@ export function createFeaturedProductsSection(
     fields: mergeFields(
       [
         { key: "heading", label: "Section Heading", type: "text", defaultValue: opts.defaultHeading ?? "Featured Products" },
+        {
+          key: "sourceType",
+          label: "Product Source",
+          type: "select",
+          defaultValue: "latest",
+          options: [
+            { label: "Latest Products", value: "latest" },
+            { label: "Specific Category", value: "category" },
+            { label: "Manual Selection", value: "manual" },
+          ],
+          helpText: "Choose how products are selected for this section.",
+        },
+        { key: "categoryId", label: "Selected Category", type: "category", helpText: "Leave empty to show all products" },
+        {
+          key: "productIds",
+          label: "Manual Products",
+          type: "product_multi",
+          defaultValue: [],
+          helpText: "Used when Product Source is Manual Selection.",
+        },
+        {
+          key: "sortBy",
+          label: "Sort Order",
+          type: "select",
+          defaultValue: "newest",
+          options: [
+            { label: "Newest First", value: "newest" },
+            { label: "Oldest First", value: "oldest" },
+            { label: "Price: Low to High", value: "price_asc" },
+            { label: "Price: High to Low", value: "price_desc" },
+            { label: "Name: A to Z", value: "name_asc" },
+          ],
+        },
         { key: "ctaLabel", label: "Archive Link Text", type: "text", defaultValue: opts.defaultCtaLabel ?? "View All" },
         { key: "ctaLink", label: "Archive Link URL", type: "url", defaultValue: opts.defaultCtaLink ?? "/collections/all" },
         { key: "limit", label: "Number of Products", type: "number", defaultValue: opts.defaultLimit ?? 8, min: 1, max: 24 },

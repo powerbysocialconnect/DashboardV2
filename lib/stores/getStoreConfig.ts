@@ -6,6 +6,10 @@ import type {
   HomepageSection,
   StoreSectionOverride,
 } from "@/types/database";
+import { getThemeByCode } from "@/lib/themes/registry";
+import { mergeThemeConfigWithDefaults } from "@/lib/themes/resolveThemeConfig";
+import { sanitizeStoredConfig } from "@/lib/themes/validateThemeConfig";
+import type { ThemeConfigData } from "@/lib/themes/types";
 
 const DEFAULT_THEME_SETTINGS: ThemeSettings = {
   primaryColor: "#111111",
@@ -31,6 +35,53 @@ const DEFAULT_HOMEPAGE_LAYOUT: HomepageSection[] = [
     limit: 8,
   },
 ];
+
+function isSchemaDrivenThemeSettings(value: unknown): value is ThemeConfigData {
+  if (!value || typeof value !== "object") return false;
+  const rec = value as Record<string, unknown>;
+  return (
+    typeof rec.themeCode === "string" &&
+    typeof rec.version === "number" &&
+    typeof rec.tokens === "object" &&
+    rec.tokens !== null &&
+    typeof rec.sections === "object" &&
+    rec.sections !== null
+  );
+}
+
+function mapResolvedSectionsToHomepageLayout(
+  themeCode: string,
+  sections: Record<string, Record<string, unknown>>
+): HomepageSection[] {
+  const themeDef = getThemeByCode(themeCode);
+  if (!themeDef) return [];
+
+  return themeDef.editableSections.map((def) => {
+    const resolvedSection = sections[def.id] || {};
+    return {
+      type: def.type as HomepageSection["type"],
+      variant: undefined,
+      ...(resolvedSection as Record<string, unknown>),
+    } as HomepageSection;
+  });
+}
+
+function mapTokensToLegacyThemeSettings(tokens: Record<string, unknown>): Partial<ThemeSettings> {
+  return {
+    primaryColor:
+      (tokens.primaryColor as string) ||
+      (tokens.accent as string) ||
+      (tokens.text as string),
+    accentColor:
+      (tokens.accentColor as string) ||
+      (tokens.accent as string),
+    backgroundColor:
+      (tokens.backgroundColor as string) ||
+      (tokens.background as string),
+    headingFont: tokens.headingFont as string,
+    bodyFont: tokens.bodyFont as string,
+  };
+}
 
 export interface StoreConfig {
   store: Store;
@@ -63,7 +114,7 @@ export async function getStoreConfig(
     .from("store_theme_configs")
     .select("*")
     .eq("store_id", storeId)
-    .single();
+    .maybeSingle();
 
   // Fetch section overrides for the active theme (published only)
   let sectionOverrides: StoreSectionOverride[] = [];
@@ -79,12 +130,49 @@ export async function getStoreConfig(
   }
 
   if (themeConfig) {
+    const rawThemeSettings = themeConfig.theme_settings as unknown;
+    const activeThemeCode = themeConfig.theme_code;
+
+    // V2 schema-driven settings: { themeCode, version, tokens, sections }
+    if (isSchemaDrivenThemeSettings(rawThemeSettings)) {
+      const themeDef = getThemeByCode(activeThemeCode);
+
+      if (themeDef) {
+        const sanitized = sanitizeStoredConfig(themeDef, {
+          tokens: rawThemeSettings.tokens,
+          sections: rawThemeSettings.sections as Record<string, Record<string, unknown>>,
+        });
+        const resolved = mergeThemeConfigWithDefaults(themeDef, sanitized);
+
+        const mappedSettings: ThemeSettings = {
+          ...DEFAULT_THEME_SETTINGS,
+          ...mapTokensToLegacyThemeSettings(resolved.tokens),
+        };
+
+        const mappedLayout = mapResolvedSectionsToHomepageLayout(
+          activeThemeCode,
+          resolved.sections as Record<string, Record<string, unknown>>
+        );
+
+        return {
+          store: store as Store,
+          themeConfig: themeConfig as StoreThemeConfig,
+          effectiveThemeSettings: mappedSettings,
+          effectiveHomepageLayout:
+            mappedLayout.length > 0 ? mappedLayout : DEFAULT_HOMEPAGE_LAYOUT,
+          sectionOverrides,
+          isUsingNewConfig: true,
+        };
+      }
+    }
+
+    // Legacy settings shape fallback
     return {
       store: store as Store,
       themeConfig: themeConfig as StoreThemeConfig,
       effectiveThemeSettings: {
         ...DEFAULT_THEME_SETTINGS,
-        ...(themeConfig.theme_settings as ThemeSettings),
+        ...(rawThemeSettings as ThemeSettings),
       },
       effectiveHomepageLayout:
         (themeConfig.homepage_layout as HomepageSection[])?.length > 0

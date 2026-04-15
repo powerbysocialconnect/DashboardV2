@@ -306,6 +306,11 @@ export interface HeadlessTemplate {
   documentation_url: string | null;
   required_plans: string[] | null;
   is_active: boolean;
+  current_version_id?: string | null;
+  package_status?: string | null;
+  source_type?: string | null;
+  package_manifest?: Record<string, unknown> | null;
+  blueprint?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }

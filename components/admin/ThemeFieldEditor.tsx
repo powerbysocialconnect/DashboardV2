@@ -136,23 +136,23 @@ function FieldInput({
       const itemFields = f.itemFields ?? [];
       const maxItems = f.maxItems ?? 20;
 
-      function updateItem(index: number, key: string, val: unknown) {
+      const updateItem = (index: number, key: string, val: unknown) => {
         const updated = [...items];
         updated[index] = { ...updated[index], [key]: val };
         onChange(updated);
-      }
+      };
 
-      function addItem() {
+      const addItem = () => {
         const emptyItem: Record<string, unknown> = {};
         for (const sub of itemFields) {
           emptyItem[sub.key] = sub.defaultValue ?? "";
         }
         onChange([...items, emptyItem]);
-      }
+      };
 
-      function removeItem(index: number) {
+      const removeItem = (index: number) => {
         onChange(items.filter((_, i) => i !== index));
-      }
+      };
 
       return (
         <div className="space-y-3">

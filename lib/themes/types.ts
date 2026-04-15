@@ -16,6 +16,7 @@ export type ThemeFieldType =
   | "text"
   | "textarea"
   | "richtext"
+  | "font"
   | "image"
   | "url"
   | "boolean"

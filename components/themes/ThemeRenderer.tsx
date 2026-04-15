@@ -67,33 +67,19 @@ export default function ThemeRenderer({
 
   return (
     <CoreLayout store={store} currency={currency} products={products} headerPages={headerPages} footerPages={footerPages}>
-      {sections && sections.length > 0 ? (
-        <div className="flex flex-col">
-          {sections.map((section: any, idx: number) => (
-            <ThemeSectionRenderer 
-              key={section.id || idx} 
-              section={section} 
-              products={products}
-              currency={currency}
-              subdomain={subdomain}
-            />
-          ))}
+      <section className="max-w-[1600px] mx-auto py-12 md:py-24 px-4 md:px-8 lg:px-12">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 md:gap-x-8 gap-y-16 lg:gap-y-24">
+          {products.length > 0 ? (
+            products.slice(0, 12).map((product: any) => (
+              <ProductCard key={product.id} product={product} currency={currency} subdomain={subdomain} />
+            ))
+          ) : (
+            <div className="col-span-full py-40 text-center border-t border-black/[0.05]">
+              <p className="text-gray-300 font-serif text-2xl italic tracking-wide">No products found.</p>
+            </div>
+          )}
         </div>
-      ) : (
-        <section className="max-w-[1600px] mx-auto py-12 md:py-24 px-4 md:px-8 lg:px-12">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 md:gap-x-8 gap-y-16 lg:gap-y-24">
-            {products.length > 0 ? (
-              products.map((product: any) => (
-                <ProductCard key={product.id} product={product} currency={currency} subdomain={subdomain} />
-              ))
-            ) : (
-              <div className="col-span-full py-40 text-center border-t border-black/[0.05]">
-                <p className="text-gray-300 font-serif text-2xl italic tracking-wide">No products found.</p>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
+      </section>
     </CoreLayout>
   );
 }

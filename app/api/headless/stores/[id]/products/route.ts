@@ -10,28 +10,57 @@ export async function GET(
   const { searchParams } = new URL(request.url);
   
   const categoryId = searchParams.get("category_id");
+  const q = searchParams.get("q");
+  const sort = searchParams.get("sort") || "latest";
+  const page = parseInt(searchParams.get("page") || "1");
   const limit = parseInt(searchParams.get("limit") || "100");
+  const offset = (page - 1) * limit;
 
   try {
     let query = supabase
       .from("products")
-      .select("*")
+      .select("*", { count: "exact" })
       .eq("store_id", storeId)
       .eq("active", true)
-      .order("created_at", { ascending: false })
-      .limit(limit);
+      .range(offset, offset + limit - 1);
 
+    // Filter by category
     if (categoryId) {
       query = query.eq("category_id", categoryId);
     }
 
-    const { data: products, error } = await query;
+    // Search query
+    if (q) {
+      query = query.or(`name.ilike.%${q}%,description.ilike.%${q}%`);
+    }
+
+    // Sorting
+    if (sort === "price_asc") {
+      query = query.order("price", { ascending: true });
+    } else if (sort === "price_desc") {
+      query = query.order("price", { ascending: false });
+    } else if (sort === "oldest") {
+      query = query.order("created_at", { ascending: true });
+    } else {
+      // Default: latest
+      query = query.order("created_at", { ascending: false });
+    }
+
+    const { data: products, error, count } = await query;
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json({ products });
+    return NextResponse.json({ 
+      products,
+      pagination: {
+        total: count || 0,
+        page,
+        limit,
+        totalPages: count ? Math.ceil(count / limit) : 0
+      }
+    });
   } catch (err) {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }

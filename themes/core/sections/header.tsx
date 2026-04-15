@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import { STOREFRONT_LOGO_HEADER_CLASSES } from '@/components/themes/core/storefrontLogo';
 import { Search, ShoppingBag, Menu } from 'lucide-react';
 import { defineSection } from '../../../packages/pixeo-theme-sdk/src/core';
 import { useUI } from '../../../packages/pixeo-theme-sdk/src/hooks/useUI';
@@ -39,7 +40,7 @@ const HeaderSection = defineSection<HeaderSettings>(
           <div className="flex-1 flex justify-center items-center">
             <a href="/" className="flex items-center justify-center">
               {settings?.logoUrl ? (
-                 <img src={settings.logoUrl} alt={settings?.logoText || 'Store Logo'} className="h-8 max-w-[150px] object-contain" />
+                 <img src={settings.logoUrl} alt={settings?.logoText || 'Store Logo'} className={STOREFRONT_LOGO_HEADER_CLASSES} />
               ) : (
                 <span className="text-xl md:text-2xl font-light tracking-[0.2em] md:tracking-[0.3em] text-black uppercase" style={{ WebkitTextStroke: '0.5px black', color: 'transparent' }}>
                   {settings?.logoText || 'CORE'}

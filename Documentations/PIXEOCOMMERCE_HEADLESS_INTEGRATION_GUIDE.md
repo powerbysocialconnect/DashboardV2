@@ -35,23 +35,52 @@ Fetches all product categories for navigation and collection pages.
 ```
 
 ### Get Product Catalog
-Fetches all active products for the store.
+Fetches all active products for the store with support for search, sorting, and pagination.
 - **Endpoint**: `GET /api/headless/stores/[STORE_ID]/products`
 - **Optional Params**: 
-  - `limit=50`
-  - `category_id=uuid` (Use this to filter by category)
+  - `limit=50` (Default: 100)
+  - `page=1` (For pagination)
+  - `category_id=uuid` (Filter by category)
+  - `q=text` (Search by name or description)
+  - `sort=latest|oldest|price_asc|price_desc`
 - **Response**:
 ```json
 {
-  "products": [
-    { 
-      "id": "...", 
-      "name": "Classic Tee", 
-      "price": 29.99, 
-      "image_urls": ["url1", "url2"],
-      "category_id": "uuid",
-      "variants": [...] 
-    }
+  "products": [...],
+  "pagination": {
+    "total": 150,
+    "page": 1,
+    "limit": 50,
+    "totalPages": 3
+  }
+}
+```
+
+### Validate Discount (NEW)
+Check if a discount code is valid before creating a checkout session.
+- **Endpoint**: `GET /api/headless/stores/[STORE_ID]/discounts/validate?code=SUMMER10`
+- **Response**:
+```json
+{
+  "valid": true,
+  "discount": {
+    "id": "uuid",
+    "code": "SUMMER10",
+    "type": "percentage",
+    "value": 10,
+    "min_order_amount": 50
+  }
+}
+```
+
+### Get Shipping Methods (NEW)
+Fetches available shipping options for the store.
+- **Endpoint**: `GET /api/headless/stores/[STORE_ID]/shipping-methods`
+- **Response**:
+```json
+{
+  "shippingMethods": [
+    { "id": "uuid", "name": "Standard Shipping", "rate": 5.00, "description": "3-5 business days" }
   ]
 }
 ```
@@ -69,7 +98,8 @@ Redirects the customer to the secure Stripe Checkout page hosted on the merchant
       "quantity": 1 
     }
   ],
-  "discount_code": "SUMMER10", // Optional: will be applied to Stripe session
+  "discount_code": "SUMMER10", // Optional: applied to Stripe session
+  "shipping_rate_id": "uuid", // Optional: selected shipping method ID
   "success_url": "https://your-custom-site.com/thanks",
   "cancel_url": "https://your-custom-site.com/cart"
 }
@@ -91,6 +121,23 @@ async function CategoryPage({ params }) {
     <div>
       <h1>Category Products</h1>
       <ProductGrid items={products} />
+    </div>
+  );
+}
+```
+
+### Implementing Server-Side Search
+```typescript
+// components/SearchBox.tsx
+async function SearchBox({ query }) {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_PIXEO_API_URL}/api/headless/stores/${process.env.NEXT_PUBLIC_STORE_ID}/products?q=${query}&limit=6`);
+  const { products } = await res.json();
+  
+  return (
+    <div className="search-results">
+      {products.map(p => (
+        <ProductCard key={p.id} product={p} />
+      ))}
     </div>
   );
 }

@@ -43,7 +43,6 @@ import {
   Users,
   Plus,
   Eye,
-  Palette,
   CreditCard,
   Clock,
   TrendingUp,
@@ -52,6 +51,7 @@ import {
   RefreshCcw,
   Truck,
   CheckCircle2,
+  ExternalLink,
 } from "lucide-react";
 
 interface DashboardStats {
@@ -214,7 +214,7 @@ export default function DashboardPage() {
         .from("store_billing_settings")
         .select("*")
         .eq("store_id", currentStore.id)
-        .single(),
+        .maybeSingle(),
       supabase
         .from("orders")
         .select("*")
@@ -287,7 +287,7 @@ export default function DashboardPage() {
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
       if (eventData) latestEventPlan = eventData.plan_name;
     } catch (e) { }
 
@@ -301,7 +301,7 @@ export default function DashboardPage() {
         .from("plan_limits")
         .select("*")
         .eq("plan_name", currentPlan)
-        .single();
+        .maybeSingle();
       if (limitData) setPlanLimit(limitData as PlanLimit);
     }
 
@@ -367,13 +367,23 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border text-sm font-medium">
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <span>
               {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
             </span>
           </div>
+          <Button variant="outline" size="sm" asChild>
+            <a
+              href={`/store/${store.subdomain}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Visit my store
+            </a>
+          </Button>
           <Button variant="outline" size="sm" onClick={loadDashboard}>
             <RefreshCcw className="mr-2 h-4 w-4" />
             Refresh
@@ -472,7 +482,7 @@ export default function DashboardPage() {
             <CardTitle className="text-lg">Recent Orders</CardTitle>
             <CardDescription>Latest customer orders</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0 px-6 pb-6">
             {recentOrders.length === 0 ? (
               <p className="py-20 text-center text-sm text-muted-foreground italic">
                 No orders yet.
@@ -482,18 +492,19 @@ export default function DashboardPage() {
                 {recentOrders.map((order) => (
                   <div
                     key={order.id}
-                    className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100"
+                    className="flex items-center justify-between gap-3 py-3 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100"
                   >
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold truncate italic">
+                    {/* shrink-0 + no truncate: italic + overflow-hidden was clipping the # on the left */}
+                    <div className="shrink-0 pl-0.5">
+                      <p className="text-sm font-bold italic tabular-nums tracking-tight">
                         #{order.id.slice(0, 8)}
                       </p>
                       <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">
                         {new Date(order.created_at).toLocaleDateString("en-GB")}
                       </p>
                     </div>
-                    <div className="flex flex-col items-end">
-                      <span className="text-sm font-bold">
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="text-sm font-bold tabular-nums">
                         {formatCurrency(order.total)}
                       </span>
                       <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 capitalize">
@@ -540,7 +551,6 @@ export default function DashboardPage() {
           <CardContent className="grid grid-cols-2 gap-3">
             {[
               { label: "New Product", href: "/dashboard/products/new", icon: Package },
-              { label: "Edit Theme", href: "/dashboard/theme", icon: Palette },
               { label: "Shipping", href: "/dashboard/settings/shipping", icon: Truck },
               { label: "Discounts", href: "/dashboard/discounts", icon: Percent },
             ].map((action) => (

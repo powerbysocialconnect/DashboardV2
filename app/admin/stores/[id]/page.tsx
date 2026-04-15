@@ -1145,7 +1145,7 @@ export default function StoreDetailPage() {
             </div>
           ) : (
             <>
-              {/* Theme code */}
+              {/* Theme code + schema editor link */}
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -1156,6 +1156,14 @@ export default function StoreDetailPage() {
                     Current theme code and configuration
                   </CardDescription>
                 </CardHeader>
+                <CardContent>
+                  <Button variant="default" asChild>
+                    <Link href={`/admin/stores/${storeId}/theme-editor`}>
+                      <Palette className="mr-2 h-4 w-4" />
+                      Open Schema Field Editor
+                    </Link>
+                  </Button>
+                </CardContent>
               </Card>
 
               {/* Theme Settings */}

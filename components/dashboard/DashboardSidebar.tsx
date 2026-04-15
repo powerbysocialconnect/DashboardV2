@@ -9,7 +9,6 @@ import {
   ShoppingCart,
   Users,
   Settings,
-  Globe,
   LogOut,
   Tag,
   Percent,
@@ -26,9 +25,8 @@ const navItems = [
   { href: "/dashboard/orders", label: "Orders", icon: ShoppingCart },
   { href: "/dashboard/shipping", label: "Shipping", icon: Truck },
   { href: "/dashboard/customers", label: "Customers", icon: Users },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
   { href: "/dashboard/discounts", label: "Discounts", icon: Percent },
-  { href: "/dashboard/domain", label: "Domain", icon: Globe },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
 interface DashboardSidebarProps {

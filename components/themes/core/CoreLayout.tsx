@@ -7,6 +7,10 @@ import {
   Ticket
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
+import {
+  STOREFRONT_LOGO_FOOTER_CLASSES,
+  STOREFRONT_LOGO_HEADER_CLASSES,
+} from "@/components/themes/core/storefrontLogo";
 import { formatPrice } from "@/lib/currency";
 import { UIProvider, useUI } from '@/packages/pixeo-theme-sdk/src/hooks/useUI';
 import { useCart, CartProvider } from '@/packages/pixeo-theme-sdk/src/hooks/useCart';
@@ -498,9 +502,9 @@ export function CoreHeader({
             <Menu className="w-5 h-5 text-gray-900 stroke-[1.25]" />
           </button>
         </div>
-        <div className="flex justify-center items-center overflow-hidden">
-          <a href={subdomain ? `/store/${subdomain}` : '/'} className="flex items-center transition-transform active:scale-95">
-            {logoUrl ? <img src={logoUrl} alt={storeName} className="h-6 md:h-8 w-auto object-contain" /> 
+        <div className="flex min-w-0 justify-center items-center px-1 sm:px-2">
+          <a href={subdomain ? `/store/${subdomain}` : '/'} className="flex max-w-full items-center justify-center transition-transform active:scale-95">
+            {logoUrl ? <img src={logoUrl} alt={storeName} className={STOREFRONT_LOGO_HEADER_CLASSES} /> 
             : <span 
                 className="text-lg md:text-2xl font-black tracking-[0.3em] uppercase whitespace-nowrap"
                 style={{
@@ -579,7 +583,7 @@ export function CoreLayout({
               <div className="mb-10">
                 <a href={getStoreLink('/')} className="block group">
                   {store.logo_url ? (
-                    <img src={store.logo_url} alt={store.name} className="h-10 w-auto object-contain mx-auto grayscale group-hover:grayscale-0 transition-all" />
+                    <img src={store.logo_url} alt={store.name} className={STOREFRONT_LOGO_FOOTER_CLASSES} />
                   ) : (
                     <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center text-white font-black text-xl group-hover:scale-105 transition-transform">
                       {store.name.charAt(0).toUpperCase()}

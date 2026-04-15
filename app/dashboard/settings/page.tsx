@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import type { Store } from "@/types/database";
+import { toast } from "sonner";
 import {
   Save,
   Check,
@@ -55,13 +56,6 @@ const CURRENCIES = [
   { value: "AUD", label: "AUD — Australian Dollar" },
 ];
 
-const SOCIAL_FIELDS = [
-  { key: "instagram", label: "Instagram", placeholder: "https://instagram.com/yourstore" },
-  { key: "twitter", label: "X", placeholder: "https://x.com/yourstore" },
-  { key: "facebook", label: "Facebook", placeholder: "https://facebook.com/yourstore" },
-  { key: "tiktok", label: "TikTok", placeholder: "https://tiktok.com/@yourstore" },
-];
-
 export default function SettingsPage() {
   const supabase = createClient();
   const [store, setStore] = useState<Store | null>(null);
@@ -74,12 +68,6 @@ export default function SettingsPage() {
   const [description, setDescription] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [logoUrl, setLogoUrl] = useState("");
-  const [socialLinks, setSocialLinks] = useState<Record<string, string>>({
-    instagram: "",
-    twitter: "",
-    facebook: "",
-    tiktok: "",
-  });
 
   useEffect(() => {
     async function init() {
@@ -88,12 +76,17 @@ export default function SettingsPage() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data } = await supabase
+      const { data, error: storeError } = await supabase
         .from("stores")
         .select("*")
         .eq("owner_id", user.id)
         .limit(1)
-        .single();
+        .maybeSingle();
+
+      if (storeError) {
+        console.error("Failed to load store:", storeError);
+        toast.error(storeError.message || "Could not load store settings.");
+      }
 
       if (data) {
         const s = data as Store;
@@ -102,26 +95,12 @@ export default function SettingsPage() {
         setDescription(s.description || "");
         setCurrency(s.currency || "USD");
         setLogoUrl(s.logo_url || "");
-
-        const branding = (s.branding || {}) as Record<string, unknown>;
-        const links = (branding.social_links || {}) as Record<string, string>;
-        setSocialLinks({
-          instagram: links.instagram || "",
-          twitter: links.twitter || "",
-          facebook: links.facebook || "",
-          tiktok: links.tiktok || "",
-        });
       }
 
       setLoading(false);
     }
     init();
   }, [supabase]);
-
-  function updateSocial(key: string, value: string) {
-    setSocialLinks((prev) => ({ ...prev, [key]: value }));
-    setSaved(false);
-  }
 
   async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -157,27 +136,39 @@ export default function SettingsPage() {
   }
 
   async function handleSave() {
-    if (!store) return;
+    if (!store) {
+      toast.error("Store is not loaded. Refresh the page and try again.");
+      return;
+    }
+    if (!name.trim() || name.trim().length < 2) {
+      toast.error("Store name must be at least 2 characters.");
+      return;
+    }
     setSaving(true);
     try {
       const existingBranding = (store.branding || {}) as Record<string, unknown>;
 
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from("stores")
         .update({
           name,
           description: description || null,
           currency,
           logo_url: logoUrl || null,
-          branding: {
-            ...existingBranding,
-            social_links: socialLinks,
-          },
+          branding: { ...existingBranding },
           updated_at: new Date().toISOString(),
         })
-        .eq("id", store.id);
+        .eq("id", store.id)
+        .select("id")
+        .maybeSingle();
 
       if (error) throw error;
+      if (!updated) {
+        toast.error(
+          "Could not save changes. You may not have permission to update this store, or it was removed."
+        );
+        return;
+      }
 
       setStore((prev) =>
         prev
@@ -187,14 +178,20 @@ export default function SettingsPage() {
               description,
               currency,
               logo_url: logoUrl || null,
-              branding: { ...existingBranding, social_links: socialLinks },
+              branding: { ...existingBranding },
             }
           : null
       );
       setSaved(true);
+      toast.success("Settings saved.");
       setTimeout(() => setSaved(false), 3000);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Failed to save settings:", err);
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message: string }).message)
+          : "Something went wrong while saving.";
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -239,7 +236,16 @@ export default function SettingsPage() {
             Manage your store configuration and preferences
           </p>
         </div>
-        <Button onClick={handleSave} disabled={saving || !nameValid}>
+        <Button
+          type="button"
+          onClick={handleSave}
+          disabled={saving || !nameValid}
+          title={
+            !nameValid
+              ? "Store name must be at least 2 characters"
+              : undefined
+          }
+        >
           {saved ? (
             <>
               <Check className="mr-2 h-4 w-4" />
@@ -489,30 +495,6 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Social Links */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Social Links</CardTitle>
-          <CardDescription>
-            Connect your social media profiles to your store
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {SOCIAL_FIELDS.map((field) => (
-            <div key={field.key} className="space-y-2">
-              <Label htmlFor={field.key}>{field.label}</Label>
-              <Input
-                id={field.key}
-                value={socialLinks[field.key] || ""}
-                onChange={(e) => updateSocial(field.key, e.target.value)}
-                placeholder={field.placeholder}
-                type="url"
-              />
-            </div>
-          ))}
         </CardContent>
       </Card>
 

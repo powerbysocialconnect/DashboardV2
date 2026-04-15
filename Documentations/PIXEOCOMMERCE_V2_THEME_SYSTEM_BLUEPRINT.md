@@ -1,6 +1,39 @@
-# PixeoCommerce V2 Theme System: The Global Blueprint (V2.1)
+# PixeoCommerce V2 Theme System: The Global Blueprint (V2.3)
 
-This document defines the production-grade architecture for a **Code-First** theme ecosystem. It moves beyond simple configuration to a professional development lifecycle—ensuring security, performance, and merchant flexibility.
+This document defines the production-grade architecture for the PixeoCommerce **Schema-Driven Theme Ecosystem**. It covers the code-first development model, the admin field editor system, validation, the **Theme SDK roadmap** for partner developers, and everything an AI or developer needs to create new themes rapidly.
+
+---
+
+## 0. North Star: A Shopify-Like Theme Ecosystem
+
+The **whole purpose** of this blueprint is to support a model comparable to **Shopify Themes**: many stores share one platform, while **theme authors**—including Pixeo’s team and **external developers**—can ship polished storefront experiences without rebuilding checkout, cart, products, or platform APIs from scratch.
+
+### How this maps to Shopify concepts
+
+| Shopify idea | PixeoCommerce equivalent |
+|--------------|---------------------------|
+| **Dawn** (reference / starter theme) | **Core** (`core`) — minimal baseline layout, cart hooks, and patterns other themes should follow or fork |
+| **Theme package** (Liquid + assets + `config`) | **ThemeDefinition** schema + React layout/components + optional `.pixeo` bundle in the long term |
+| **Theme Store** (discovery & install) | **Theme registry** (`lib/themes/registry.ts`) + admin assignment per store (future: marketplace-style listing) |
+| **Theme settings** (merchant-facing knobs) | **Tokens + sections** in `theme_settings`, edited via the **schema-driven field editor** (no per-theme hardcoded admin forms) |
+| **Sections** | Same mental model: composable blocks (hero, featured products, footer) with a **typed schema** per theme |
+| **Third-party theme developers** | Devs **fork or remake Core**, add their own `ThemeDefinition`, register it, and implement `ThemeRenderer` — same contracts (`store`, `products`, `useCart`, etc.) |
+| **Theme Kit / CLI + local dev** | **Pixeo Theme SDK** (`@pixeo/theme-types`, starter template, `pixeo` CLI) — see **§2.1** |
+
+### What third-party developers are meant to do
+
+1. **Treat Core as the boilerplate**, not a black box. Copy its layout shell, cart integration, and data patterns; replace visuals, typography, and section composition.
+2. **Declare a `ThemeDefinition`** (tokens + sections + fields) so the **admin field editor** and **API validation** stay automatic—same as Shopify’s `settings_schema` driving the customizer.
+3. **Register the theme** in the registry and wire rendering in **ThemeRenderer** so the platform can assign the theme to a store safely.
+4. **Never bypass the contract**: themes receive **resolved config + store data** through documented props; they do not talk to the database directly.
+
+### What the platform guarantees
+
+- **One runtime, many themes**: storefront resolution, products, cart, and auth stay on the host; themes are **skins + section layouts** over that runtime.
+- **Schema-first**: new themes scale because merchants and admins configure through **fields derived from the schema**, not bespoke dashboards per theme.
+- **Path to a full “Theme Store”**: today the registry is in-repo; the same **ThemeDefinition + validation + merge** pipeline is the foundation for publishing third-party packages later (CLI push, signed bundles, versioning).
+
+This document is the **contract** that keeps internal themes, partner themes, and AI-generated themes aligned—so you can keep adding theme after theme without fragmenting the platform.
 
 ---
 
@@ -10,13 +43,80 @@ Themes in V2 are not mere database entries; they are **compiled software package
 - **Unified Logic**: The same SDK works for internal Pixeo builders and external ecosystem developers.
 - **Contract Driven**: The SDK defines the strict interface between Store Data and Scene Rendering.
 - **Immutable Versions**: Once a theme version is published, it is never modified. Upgrades are explicit.
+- **Schema-Driven Admin**: The admin field editor is generated dynamically from each theme's schema definition. No per-theme hardcoded forms.
 
 ---
 
 ## 2. Ecosystem Separation (Critical)
-The PixeoCommerce ecosystem is split into two distinct repositories to ensure modularity and scalability:
-1.  **The Host Platform (This Repo)**: Acts as the **Registry** and **Runtime Host**. It stores theme metadata, handles merchant assignments, and renders the stores.
-2.  **The Theme SDK & Starter Template (Separate Repo)**: This is where the actual theme development happens. It contains the CLI, the React base components, and the compilation logic.
+The PixeoCommerce ecosystem is split into two distinct repositories to ensure modularity and scalability—mirroring how **Shopify** separates the **admin + Online Store runtime** from **theme source code** that authors ship independently:
+
+1.  **The Host Platform (This Repo)**: Acts as the **Registry** and **Runtime Host**. It stores theme metadata, handles merchant assignments, validates saved config against each theme’s schema, and renders the stores. This is where **Core** lives as the canonical reference theme other devs can **remake or extend**.
+2.  **The Theme SDK & Starter Template (Separate Repo)**: Where **external developers** clone a starter, iterate on layouts and CSS, run builds, and (in the full vision) **push** versioned theme packages—without needing full access to merchant data or platform internals. Same idea as developing a Shopify theme in your own repo and uploading the ZIP.
+
+**Practical note for today:** third-party work may still start by **forking `components/themes/core/` and `lib/themes/definitions/core.ts`** in this repo or a private fork; the split-repo model is the **target shape** so theme shops can eventually work like Shopify theme partners.
+
+---
+
+## 2.1 The Pixeo Theme SDK (Required for Partner Expansion)
+
+You **do** need a first-class **Theme SDK** so Pixeo can hand **Core** (and the schema contract) to other developers, let them build and test themes **outside** the main monorepo, and scale the ecosystem—same role Shopify’s **Theme Kit / CLI + Dawn** play for partners.
+
+### Goals
+
+| Goal | Outcome |
+|------|--------|
+| **Distributable Core** | Partners get a **starter repo** (or tarball) derived from Core: layout, cart patterns, section examples—not a vague “read our codebase.” |
+| **Shared contract** | `@pixeo/theme-sdk` (name TBD) publishes **TypeScript types** aligned with `lib/themes/types.ts`, **section builders**, and docs so schemas stay in sync with the host. |
+| **Local dev without production DB** | `pixeo dev` (or `pnpm theme:dev`) runs a **Vite** storefront shell with **mock store/product data**, so themes are developed like Shopify themes in isolation. |
+| **Validate before submit** | `pixeo validate` runs the same rules as the host: schema shape, forbidden APIs, bundle size—fail fast before review. |
+| **Ship artifacts** | `pixeo build` outputs the **`.pixeo` / `dist/`** layout (see §3); `pixeo push` (later) uploads to Pixeo’s registry for admin assignment. |
+
+### What the SDK repo contains (target layout)
+
+```
+pixeo-theme-sdk/                 # npm workspace or single package
+├── packages/
+│   ├── theme-types/             # Mirrors ThemeDefinition, fields, tokens (synced from host or generated)
+│   ├── theme-section-builders/  # Optional: shared createHeroSection, etc.
+│   └── cli/                     # pixeo-cli: dev | build | validate | push
+├── starters/
+│   └── core-theme/              # Forkable template: React + Tailwind + Core layout parity
+└── README.md
+```
+
+- **`theme-types`**: Published to npm as **`@pixeo/theme-types`** (or scoped under your org). Host platform imports the **same** major version to avoid drift; alternatively the host remains source of truth and types are **copied on release** (document the process).
+- **`starters/core-theme`**: The **gift to other devs**—clone, rename, add sections, publish. Includes a **sample `ThemeDefinition`** and instructions to register on the host (or submit a PR / bundle).
+
+### What stays on the host platform (this repo)
+
+- **Registry** (`getThemeByCode`, assignment per store).
+- **Admin field editor** + **API validation** (`validateThemeConfig`).
+- **ThemeRenderer** and production **data loading** (Supabase, cart, products).
+- **Ingestion** of partner-built themes: today = merge their code or copy bundle into `components/themes/`; future = load **versioned bundle** from storage/CDN.
+
+### Phased rollout (recommended)
+
+1. **Phase A — Publishable contract (low risk)**  
+   Extract or duplicate **`ThemeDefinition` types + section builder patterns** into a public **`@pixeo/theme-types`** package (or git submodule). Document “host version X uses types `^1.y`.” Partners install from npm; Pixeo pins the same version in the host.
+
+2. **Phase B — Starter template repo**  
+   Public (or licensed) repo: **Core storefront UI** + Tailwind + **mock data** + README “how to add a section + schema.” Dev workflow: **Vite** for fast HMR; **no** requirement to run the full Next app.
+
+3. **Phase C — CLI**  
+   `pixeo dev` / `build` / `validate` wrapping Vite and static checks. Output matches §3 `dist/` so the host can adopt **remote bundles** later.
+
+4. **Phase D — Registry & push**  
+   Authenticated `pixeo push`, theme listing, semver, signing—full **Shopify Theme Store**-style pipeline.
+
+### Relationship to the current codebase
+
+- **Today:** themes live **inside** Next.js; bundler is **Next**, not Vite (see repo `package.json`).
+- **SDK world:** partners work in the **starter + CLI** repo with **Vite** for dev/build of the **theme artifact**; the **host** remains Next and either **imports** partner React code (monorepo/git dep) or **loads** the compiled bundle when Phase D exists.
+
+### Success criteria
+
+- A developer who has **never** cloned the full PixeoCommerce app can **build a new theme** using only the SDK + starter, then deliver an artifact Pixeo can **register and assign** to a store.
+- Pixeo can **version Core** in the starter and **changelog** breaking schema changes (`ThemeDefinition.version`).
 
 ---
 
@@ -39,7 +139,7 @@ The platform never executes raw source code. It uses a **Theme Runtime Layer**.
 1. **The Loader**: Fetches the `bundle.js` and `manifest.json` for the active version.
 2. **Injection**: Safely injects the theme into the storefront page without granting access to internal platform globals.
 3. **The Scenery Engine**:
-   - Loops through the Store’s homepage template.
+   - Loops through the Store's homepage template.
    - For each section, it calls the corresponding component from the theme bundle.
    - Passes a standard `PixeoContext` (Data + Merged Settings).
 4. **Sandboxing**: Previews in the Admin Dashboard are wrapped in a **Sandboxed Iframe** to isolate the Merchant UI from the Theme Code.
@@ -89,23 +189,44 @@ Merchant customization works via a robust, schema-driven multi-layer merge strat
 
 ### 7.1. The 3-Layer Merge Pipeline
 Every section rendered in a Pixeo storefront is the result of a pure merge function (`mergeSectionData`):
-1.  **Layer 1: Schema Defaults**: hardcoded fallbacks defined in `lib/themes/sectionSchemas.ts`.
-2.  **Layer 2: Theme Section**: The baseline content defined in the theme's `homepage_layout`.
-3.  **Layer 3: Store Overrides**: Sparse field-level overrides stored in the `store_section_overrides` database table.
+1.  **Layer 1: Schema Defaults**: hardcoded fallbacks defined in the theme's `ThemeDefinition`.
+2.  **Layer 2: Stored Config**: The per-store overrides saved in `store_theme_configs.theme_settings`.
+3.  **Layer 3: Resolution**: The `mergeThemeConfigWithDefaults()` utility merges layers, filling gaps with schema defaults.
 
-**Merge Rule**: The engine iterates over **Schema fields only**. If a store has an override for a field that was removed from the theme schema, it is ignored at runtime (Schema Change Safety).
+**Merge Rule**: The engine iterates over **Schema fields only**. If a store has a stored value for a field that was removed from the theme schema, it is ignored at runtime (Schema Change Safety).
 
 ### 7.2. Persistence Architecture
-Overrides are stored in a dedicated `store_section_overrides` table with the following properties:
-- **Sparse Storage**: Only fields modified by the merchant are saved in the `overrides` JSONB column.
-- **Theme Scoping**: All overrides are scoped to a `theme_code`. If a store switches themes, their old overrides remain safely dormant and do not collide with the new theme's sections.
-- **Instance Identity**: Overrides are matched via `section_type` + `section_index`.
+Theme configs are stored in `store_theme_configs.theme_settings` (JSONB) with this shape:
+```json
+{
+  "themeCode": "glowing",
+  "version": 2,
+  "tokens": {
+    "background": "#F5F1EB",
+    "text": "#111111",
+    "accent": "#C8B28A"
+  },
+  "sections": {
+    "hero": {
+      "enabled": true,
+      "overlayHeading": "Glow Naturally",
+      "ctaLabel": "Shop Now",
+      "ctaLink": "/collections/all"
+    },
+    "newsletter": {
+      "enabled": true,
+      "heading": "Good emails",
+      "subheading": "Sign up and receive 10% off."
+    }
+  }
+}
+```
 
-### 7.3. The Schema Registry (Source of Truth)
-The platform maintains a central file (`lib/themes/sectionSchemas.ts`) that defines:
-- Every editable field (ID, Type, Label).
-- Validation rules (MaxLength, FileSize, RecommendedAspectRatio).
-- Dynamic Form Grouping for the Admin UI.
+### 7.3. Resolution Utilities
+- `buildDefaultThemeConfig(themeDef)` — Generates a complete config from schema defaults.
+- `mergeThemeConfigWithDefaults(themeDef, storedConfig)` — Merges stored overrides over schema defaults.
+- `resolveSectionConfig(themeDef, sectionId, storedSections)` — Resolves a single section for storefront use.
+- `sanitizeStoredConfig(themeDef, stored)` — Strips stale keys that no longer exist in the current schema version.
 
 ### 7.4. Draft & Publish Workflow
 The system supports a stateful lifecycle via the `is_draft` column:
@@ -116,20 +237,45 @@ The system supports a stateful lifecycle via the `is_draft` column:
 ---
 
 ## 8. Security & Validation Constraints
+
+### 8.1. Theme Code Security
 The `pixeo-cli push` command performs static analysis.
 
-### Hard Blocks (Push Forbidden):
+#### Hard Blocks (Push Forbidden):
 - **No External Scripts**: `<script src="...">` tags or `document.createElement('script')` are blocked.
 - **No Unsafe Execution**: Use of `eval()`, `new Function()`, or `innerHTML` (without sanitization) is blocked.
 - **Restricted API**: Themes cannot access `window.localStorage`, `cookies`, or the platform's internal API keys.
-- [ ] **Data Privacy**: Themes can only access data provided via the authorized `Store` and `Product` interfaces.
-- [ ] **Resource Limits**: Themes cannot perform heavy computational tasks or large unoptimized loops during rendering.
+- **Data Privacy**: Themes can only access data provided via the authorized `Store` and `Product` interfaces.
+- **Resource Limits**: Themes cannot perform heavy computational tasks or large unoptimized loops during rendering.
+
+### 8.2. Admin API Validation (Backend Schema Enforcement)
+The PUT route (`/api/admin/stores/[id]/theme-config`) validates all incoming data against the active theme schema using `validateThemeConfig()`.
+
+**What is validated:**
+- Unknown section keys are rejected
+- Unknown field keys within sections are rejected
+- Field type enforcement: text must be string, number must be numeric, boolean must be boolean, etc.
+- Required fields are enforced
+- Select field values are checked against allowed options
+- URL/image fields are validated for safe URL patterns (`/…` or `https://…`)
+- Color fields are validated for hex format (`#RGB`, `#RRGGBB`, `#RRGGBBAA`)
+- Number fields are checked against `min`/`max` constraints
+- String fields are checked against `minLength`/`maxLength`
+- Repeater fields are validated recursively (item count, item field types)
+- Unknown tokens are rejected
+- Sanitized data (with invalid keys stripped) is what gets saved
+
+**Validation is reusable**: `lib/themes/validateThemeConfig.ts` exports:
+- `validateThemeConfig(themeDef, payload)` — Full validation with error list
+- `getAllowedFieldPaths(themeDef)` — All valid dot-paths for debugging
+- `sanitizeStoredConfig(themeDef, stored)` — Strip stale/invalid keys
 
 ---
 
 ## 9. Fallback & Error Handling
 - **Section Isolation**: If a specific section crashes (Runtime Error), the **Scenery Engine** catches it, logs it, and renders a "Section Unavailable" placeholder instead of crashing the entire storefront.
 - **Version Compatibility**: If a store uses an old version of a theme that is missing a newly required SDK field, the platform provides a "Safe Default".
+- **Default Resolution**: Missing fields never break the admin editor or storefront because `mergeThemeConfigWithDefaults()` always fills gaps with schema defaults.
 
 ---
 
@@ -277,7 +423,7 @@ case "services_grid":
 
 ### Critical Rules for Section Developers:
 1.  **No Direct DB Access**: Sections must never fetch their own data. They receive everything via props.
-2.  **Schema-Driven Only**: Only fields defined in the `sectionSchemas.ts` will be available in the `section` prop. Unregistered properties are filtered out for security.
+2.  **Schema-Driven Only**: Only fields defined in the schema will be available in the `section` prop. Unregistered properties are filtered out for security.
 3.  **Default Handling**: Always provide sensible defaults in the schema so the theme looks good even before a merchant customizes it.
 
 ---
@@ -331,37 +477,347 @@ module.exports = {
 
 ## 16. Admin Customizer & Settings Schema
 
-Customization is driven by a `settings_schema.json` file provided by the theme. This allows the Admin Dashboard to render a tailored UI for every theme.
+Customization is driven by the theme's `ThemeDefinition` TypeScript schema. This allows the Admin Dashboard to render a tailored UI for every theme automatically.
 
 ### 16.1. Schema Definition
-The schema defines the "Knobs and Dials" available to the merchant:
+The schema defines the "Knobs and Dials" available to the admin. See Section 17 for the full TypeScript reference.
+
+### 16.2. The Dynamic Customizer UI
+1. **Introspection**: The Admin Dashboard reads the theme's schema from the registry.
+2. **Generation**: It loops through tokens and section fields, rendering the appropriate inputs (color pickers, text fields, toggles, selects, repeaters).
+3. **Persistence**: When the admin clicks "Save", the values are validated server-side and stored in `store_theme_configs.theme_settings` JSONB column.
+4. **Validation**: The API rejects unknown keys, enforces types, validates required fields, and sanitizes data before saving.
+
+---
+
+## 17. Schema-Driven Theme Definition Reference (V2 Field Editor)
+
+This section is the **complete reference** for building new themes using the schema-driven field editor system. Use this to create themes rapidly with AI or manually.
+
+### 17.1. File Structure
+
+```
+lib/themes/
+├── types.ts                  # All TypeScript interfaces
+├── registry.ts               # Central theme registry
+├── sectionBuilders.ts        # Reusable section schema builders
+├── validateThemeConfig.ts    # Backend validation utility
+├── resolveThemeConfig.ts     # Default resolution & merge utility
+└── definitions/
+    ├── core.ts               # Core theme schema
+    ├── glowing.ts            # Glowing theme schema
+    └── <new-theme>.ts        # Add new themes here
+```
+
+### 17.2. ThemeDefinition Interface
+
+Every theme must export a `ThemeDefinition` object:
+
+```typescript
+interface ThemeDefinition {
+  code: string;           // Unique identifier, e.g. "glowing", "minimal", "luxe"
+  name: string;           // Display name, e.g. "Glowing Skincare"
+  version: number;        // Schema version. Increment when fields change.
+  description?: string;   // Short description shown in admin UI
+  thumbnail?: string;     // Optional preview image URL
+  minPlan?: string;       // Required plan tier, e.g. "Premium Store"
+  editableTokens?: ThemeTokenDefinition[];      // Global design variables
+  editableSections: ThemeSectionDefinition[];    // Page sections with fields
+}
+```
+
+### 17.3. Available Field Types
+
+| Type | Value stored as | Admin UI | Validation |
+|------|----------------|----------|------------|
+| `text` | `string` | Single-line text input | `minLength`, `maxLength` |
+| `textarea` | `string` | Multi-line text area | `minLength`, `maxLength` |
+| `richtext` | `string` | Multi-line text area (future: rich editor) | `minLength`, `maxLength` |
+| `image` | `string` (URL) | URL input | Must start with `/` or `http` |
+| `url` | `string` (URL) | URL input | Must start with `/` or `http` |
+| `boolean` | `boolean` | Toggle switch | Must be `true`/`false` |
+| `number` | `number` | Numeric input | `min`, `max`, `step` |
+| `select` | `string` | Dropdown | Value must be in `options[]` |
+| `color` | `string` (hex) | Color picker + hex input | Must match `#RGB`/`#RRGGBB`/`#RRGGBBAA` |
+| `repeater` | `Array<Record<string, unknown>>` | List of item groups with add/remove | `maxItems`, each item validated recursively via `itemFields` |
+
+### 17.4. ThemeFieldDefinition Interface
+
+```typescript
+interface ThemeFieldDefinition {
+  key: string;            // Unique key within the section, e.g. "heading"
+  label: string;          // Display label in admin, e.g. "Section Heading"
+  type: ThemeFieldType;   // One of the types above
+  required?: boolean;     // If true, API rejects empty/missing values
+  defaultValue?: unknown; // Default value used when store has no override
+  placeholder?: string;   // Placeholder text for text inputs
+  helpText?: string;      // Small description shown below the field
+
+  // Select-specific
+  options?: { label: string; value: string }[];
+
+  // Text/textarea validation
+  maxLength?: number;
+  minLength?: number;
+
+  // Number validation
+  min?: number;
+  max?: number;
+  step?: number;
+
+  // Repeater-specific
+  itemFields?: ThemeFieldDefinition[];   // Shape of each item
+  maxItems?: number;                     // Max number of items
+}
+```
+
+### 17.5. ThemeTokenDefinition Interface
+
+```typescript
+interface ThemeTokenDefinition {
+  key: string;               // e.g. "primaryColor"
+  label: string;             // e.g. "Primary Color"
+  type: "color" | "text" | "font";
+  defaultValue?: string;
+  helpText?: string;
+}
+```
+
+### 17.6. ThemeSectionDefinition Interface
+
+```typescript
+interface ThemeSectionDefinition {
+  id: string;                // Unique section ID, e.g. "hero"
+  type: string;              // Section type for the renderer, e.g. "hero"
+  label: string;             // Display label, e.g. "Hero Banner"
+  description?: string;      // Description shown in admin
+  fields: ThemeFieldDefinition[];
+  supportsToggle?: boolean;  // Show enable/disable toggle (default: true)
+  defaultEnabled?: boolean;  // Default enabled state (default: true)
+}
+```
+
+### 17.7. Section Enabled/Disabled System
+
+Every section can be toggled on or off:
+- If `supportsToggle` is `true` (default), the admin editor shows an Enable/Disable switch
+- The `enabled` boolean is stored in the section's config: `sections.hero.enabled = true`
+- The storefront renderer should check `sectionConfig.enabled` before rendering
+- Sections with `supportsToggle: false` (like header/footer) are always shown
+
+### 17.8. Repeater Fields
+
+Repeater fields store arrays of structured items. Use them instead of `feature1Title`, `feature2Title` patterns.
+
+**Schema example:**
+```typescript
+{
+  key: "tiles",
+  label: "Promo Tiles",
+  type: "repeater",
+  maxItems: 6,
+  defaultValue: [
+    { image: "", title: "Collection 1", buttonLabel: "Shop Now", buttonLink: "/collections/all" },
+    { image: "", title: "Collection 2", buttonLabel: "Shop Now", buttonLink: "/collections/all" },
+  ],
+  itemFields: [
+    { key: "image", label: "Tile Image", type: "image" },
+    { key: "title", label: "Title", type: "text" },
+    { key: "buttonLabel", label: "Button Label", type: "text" },
+    { key: "buttonLink", label: "Button Link", type: "url" },
+  ],
+}
+```
+
+**Stored value:**
 ```json
 {
-  "settings": [
-    {
-      "id": "colors",
-      "label": "Branding Colors",
-      "type": "group",
-      "fields": [
-        { "id": "primary_color", "type": "color", "label": "Primary Brand", "default": "#000000" },
-        { "id": "accent_color", "type": "color", "label": "Accent / CTA", "default": "#FF3E00" }
-      ]
-    },
-    {
-      "id": "typography",
-      "label": "Fonts",
-      "type": "group",
-      "fields": [
-        { "id": "heading_font", "type": "font_picker", "label": "Heading Font", "default": "Outfit" }
-      ]
-    }
+  "tiles": [
+    { "image": "/uploads/tile1.jpg", "title": "Summer Collection", "buttonLabel": "Shop Now", "buttonLink": "/collections/summer" },
+    { "image": "/uploads/tile2.jpg", "title": "New Arrivals", "buttonLabel": "Explore", "buttonLink": "/collections/new" }
   ]
 }
 ```
 
-### 16.2. The Dynamic Customizer UI
-1. **Introspection**: The Admin Dashboard reads the theme's schema.
-2. **Generation**: It loops through the `fields` and renders the appropriate React Hook Form components (Color Pickers, Font Dropdowns, Image Uploaders).
-3. **Persistence**: When the merchant clicks "Save", the values are stored in the `store_theme_configs.theme_settings` JSONB column.
-4. **Instant Preview**: Changes are pushed to a hidden iframe running the **Theme Runtime**, updating the CSS Variables in real-time for a "What You See Is What You Get" (WYSIWYG) experience.
+### 17.9. Reusable Section Builders
 
+`lib/themes/sectionBuilders.ts` provides builder functions that return `ThemeSectionDefinition` objects. These reduce duplication across themes.
+
+| Builder | Section ID | Description |
+|---------|-----------|-------------|
+| `createAnnouncementBarSection(opts)` | `announcement_bar` | Top-of-page promo strip |
+| `createHeaderSection(opts)` | `header` | Logo, nav links, sticky toggle |
+| `createHeroSection(opts)` | `hero` | Full-width hero with overlay text |
+| `createBrandStatementSection(opts)` | `brand_statement` | Centered quote/tagline |
+| `createServiceFeaturesSection(opts)` | `service_features` | Icon grid of selling points (repeater) |
+| `createLogoCloudSection(opts)` | `logo_cloud` | Press/brand logo row (repeater) |
+| `createPromoTilesSection(opts)` | `collection_promo` | Side-by-side promo cards (repeater) |
+| `createFeaturedProductsSection(opts)` | `featured_products` | Product grid with heading |
+| `createNewsletterSection(opts)` | `newsletter` | Email signup section |
+| `createSocialGallerySection(opts)` | `social_gallery` | Instagram-style image grid |
+| `createFooterSection(opts)` | `footer` | Brand info, links, legal |
+
+**All builders accept:**
+- Theme-specific default overrides (e.g. `defaultHeading`, `defaultBg`)
+- `extraFields?: ThemeFieldDefinition[]` — Append additional fields unique to this theme
+- `description?: string` — Override the default description
+- `supportsToggle?: boolean` — Override toggle behavior
+- `defaultEnabled?: boolean` — Override default enabled state
+
+**Usage in a theme definition:**
+```typescript
+import { createHeroSection, createNewsletterSection } from "@/lib/themes/sectionBuilders";
+
+export const myTheme: ThemeDefinition = {
+  code: "mytheme",
+  name: "My Theme",
+  version: 1,
+  editableSections: [
+    createHeroSection({ defaultCtaLabel: "Discover" }),
+    createNewsletterSection({ defaultHeading: "Join the club" }),
+  ],
+};
+```
+
+---
+
+## 18. How to Create a New Theme (Step-by-Step for AI & Developers)
+
+This is the **Shopify-like path** for Pixeo: you are not inventing commerce from zero—you are **shipping a new theme** on top of the platform runtime. The fastest approach for humans or AI is to **copy Core** (`lib/themes/definitions/core.ts` + `components/themes/core/`), rename and restyle, adjust the `ThemeDefinition` (tokens and sections), then register. That mirrors forking **Dawn** to make a custom Shopify theme: same platform APIs, new look and optional new sections.
+
+### Step 1: Create the schema definition file
+
+Create `lib/themes/definitions/<name>.ts`:
+
+```typescript
+import type { ThemeDefinition } from "../types";
+import {
+  createHeaderSection,
+  createHeroSection,
+  createFeaturedProductsSection,
+  createNewsletterSection,
+  createFooterSection,
+} from "../sectionBuilders";
+
+export const myNewTheme: ThemeDefinition = {
+  code: "my-theme",     // lowercase, kebab-case
+  name: "My New Theme",
+  version: 1,
+  description: "A brief description of the theme's aesthetic.",
+  minPlan: "Pro",        // optional
+
+  editableTokens: [
+    { key: "primaryColor", label: "Primary Color", type: "color", defaultValue: "#000000" },
+    { key: "accentColor", label: "Accent Color", type: "color", defaultValue: "#FF6600" },
+    { key: "backgroundColor", label: "Background", type: "color", defaultValue: "#FFFFFF" },
+    { key: "headingFont", label: "Heading Font", type: "font", defaultValue: "Playfair Display" },
+    { key: "bodyFont", label: "Body Font", type: "font", defaultValue: "Inter" },
+  ],
+
+  editableSections: [
+    createHeaderSection({ defaultLogoText: "MY BRAND" }),
+    createHeroSection({ defaultCtaLabel: "Shop Now" }),
+    createFeaturedProductsSection({ defaultHeading: "Trending Now" }),
+    createNewsletterSection({ defaultHeading: "Stay Connected" }),
+    createFooterSection({ defaultBrandName: "MY BRAND" }),
+  ],
+};
+```
+
+### Step 2: Register in the theme registry
+
+Edit `lib/themes/registry.ts`:
+
+```typescript
+import { myNewTheme } from "./definitions/my-theme";
+
+const THEME_REGISTRY: Record<string, ThemeDefinition> = {
+  [coreTheme.code]: coreTheme,
+  [glowingTheme.code]: glowingTheme,
+  [myNewTheme.code]: myNewTheme,    // <-- add here
+};
+```
+
+### Step 3: Create the visual theme components
+
+Create the React layout and section components in `components/themes/<name>/`. Each component receives resolved config via props.
+
+### Step 4: Wire into ThemeRenderer
+
+Add a case for the new theme code in the ThemeRenderer switch.
+
+### Step 5: Test
+
+1. Go to Admin > Stores > [Store] > Theme Editor
+2. Switch to the new theme
+3. Verify all sections and fields render correctly
+4. Save and check that validation passes
+5. View the storefront to confirm rendering
+
+---
+
+## 19. Existing Theme Schemas
+
+### 19.1. Core Theme (`core`)
+- **Version**: 2
+- **Plan**: None (default for all stores)
+- **Tokens**: primaryColor, accentColor, backgroundColor, headingFont, bodyFont
+- **Sections**: header, featured_products, footer
+
+### 19.2. Glowing Skincare Theme (`glowing`)
+- **Version**: 2
+- **Plan**: Premium Store
+- **Tokens**: background, surface, text, accent, headingFont, bodyFont
+- **Sections**: announcement_bar, header, hero, brand_statement, service_features, logo_cloud, collection_promo, featured_products, newsletter, social_gallery, footer
+
+---
+
+## 20. Permissions Model
+
+| Role | Can view themes | Can switch theme | Can edit theme fields | Can save config |
+|------|----------------|-----------------|----------------------|-----------------|
+| Admin | Yes | Yes | Yes | Yes |
+| Merchant | Yes (read-only) | No | No | No |
+
+- **Backend enforcement**: API route checks `profiles.is_admin` before allowing PUT operations
+- **Frontend enforcement**: Merchant dashboard shows view-only theme page with info banner
+
+---
+
+## 21. Data Migration Notes
+
+When upgrading a theme's schema version:
+- Old stored configs are automatically sanitized via `sanitizeStoredConfig()` — stale keys are stripped
+- Missing new fields are filled via `mergeThemeConfigWithDefaults()` — no manual migration needed
+- Increment the theme's `version` number in the definition file
+- Existing stores will see new fields with their defaults on next load
+
+---
+
+## 22. Config Storage Shape (TypeScript)
+
+```typescript
+interface ThemeConfigData {
+  themeCode: string;
+  version: number;
+  tokens: Record<string, unknown>;
+  sections: Record<string, ThemeSectionConfigData>;
+}
+
+interface ThemeSectionConfigData {
+  enabled?: boolean;
+  [fieldKey: string]: unknown;
+}
+
+interface ResolvedThemeConfig {
+  themeCode: string;
+  version: number;
+  tokens: Record<string, unknown>;
+  sections: Record<string, ResolvedSectionConfig>;
+}
+
+interface ResolvedSectionConfig {
+  enabled: boolean;
+  [fieldKey: string]: unknown;
+}
+```

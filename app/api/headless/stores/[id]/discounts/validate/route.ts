@@ -11,7 +11,12 @@ export async function GET(
   const code = searchParams.get("code");
 
   if (!code) {
-    return NextResponse.json({ error: "No code provided" }, { status: 400 });
+    return NextResponse.json({ 
+      error: { 
+        code: "MISSING_CODE", 
+        message: "No discount code was provided." 
+      } 
+    }, { status: 400 });
   }
 
   try {
@@ -24,22 +29,46 @@ export async function GET(
       .maybeSingle();
 
     if (error || !discount) {
-      return NextResponse.json({ valid: false, error: "Invalid or inactive discount code" });
+      return NextResponse.json({ 
+        valid: false, 
+        error: { 
+          code: "INVALID_DISCOUNT", 
+          message: "Invalid or inactive discount code" 
+        } 
+      });
     }
 
     // Check expiration
     if (discount.expires_at && new Date(discount.expires_at) < new Date()) {
-      return NextResponse.json({ valid: false, error: "This discount code has expired" });
+      return NextResponse.json({ 
+        valid: false, 
+        error: { 
+          code: "DISCOUNT_EXPIRED", 
+          message: "This discount code has expired" 
+        } 
+      });
     }
 
     // Check usage limits
     if (discount.max_uses && discount.uses_count >= discount.max_uses) {
-      return NextResponse.json({ valid: false, error: "This discount code has reached its usage limit" });
+      return NextResponse.json({ 
+        valid: false, 
+        error: { 
+          code: "DISCOUNT_LIMIT_REACHED", 
+          message: "This discount code has reached its usage limit" 
+        } 
+      });
     }
 
     // Check starts_at
     if (discount.starts_at && new Date(discount.starts_at) > new Date()) {
-      return NextResponse.json({ valid: false, error: "This discount code is not yet active" });
+      return NextResponse.json({ 
+        valid: false, 
+        error: { 
+          code: "DISCOUNT_NOT_YET_ACTIVE", 
+          message: "This discount code is not yet active" 
+        } 
+      });
     }
 
     return NextResponse.json({
@@ -54,6 +83,11 @@ export async function GET(
     });
   } catch (err: any) {
     console.error(`[HEADLESS DISCOUNT VALIDATION ERROR]`, err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json({ 
+      error: { 
+        code: "INTERNAL_SERVER_ERROR", 
+        message: "An unexpected error occurred during discount validation." 
+      } 
+    }, { status: 500 });
   }
 }

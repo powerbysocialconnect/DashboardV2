@@ -49,7 +49,12 @@ export async function GET(
     const { data: products, error, count } = await query;
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ 
+        error: { 
+          code: "DATABASE_ERROR", 
+          message: error.message 
+        } 
+      }, { status: 400 });
     }
 
     return NextResponse.json({ 
@@ -62,6 +67,11 @@ export async function GET(
       }
     });
   } catch (err) {
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ 
+      error: { 
+        code: "INTERNAL_SERVER_ERROR", 
+        message: "An unexpected error occurred while fetching products." 
+      } 
+    }, { status: 500 });
   }
 }

@@ -25,7 +25,12 @@ export async function GET(
       .single();
 
     if (error || !store) {
-      return NextResponse.json({ error: "Store not found" }, { status: 404 });
+      return NextResponse.json({ 
+        error: { 
+          code: "STORE_NOT_FOUND", 
+          message: "The requested store does not exist or is inactive." 
+        } 
+      }, { status: 404 });
     }
 
     // Fetch theme config as well
@@ -40,6 +45,11 @@ export async function GET(
       themeConfig
     });
   } catch (err) {
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ 
+      error: { 
+        code: "INTERNAL_SERVER_ERROR", 
+        message: "An unexpected error occurred while fetching store info." 
+      } 
+    }, { status: 500 });
   }
 }

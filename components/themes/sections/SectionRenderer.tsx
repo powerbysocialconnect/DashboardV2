@@ -3,10 +3,12 @@
 import React from 'react';
 import { Hero } from './Hero';
 import { FeaturedProducts } from './FeaturedProducts';
+import CategoryGrid from './CategoryGrid';
 
 export function ThemeSectionRenderer({ 
   section, 
   products, 
+  categories = [],
   currency, 
   subdomain 
 }: any) {
@@ -27,7 +29,24 @@ export function ThemeSectionRenderer({
           subdomain={subdomain} 
         />
       );
-
+    
+    case 'category_grid':
+      return (
+        <CategoryGrid 
+          section={section} 
+          categories={categories}
+          settings={{
+            primaryColor: section.primaryColor || '#000000',
+            accentColor: section.accentColor || '#666666',
+            backgroundColor: section.backgroundColor || '#FFFFFF',
+            headingFont: 'Inter',
+            bodyFont: 'Inter',
+            buttonStyle: 'rounded',
+            logoAlignment: 'left'
+          }} 
+        />
+      );
+    
     case 'brand_statement':
       return (
         <section className="bg-white py-24 md:py-32 border-b border-black/[0.05]">

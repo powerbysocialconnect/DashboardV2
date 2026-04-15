@@ -17,12 +17,22 @@ export async function GET(
       .order("rate", { ascending: true });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ 
+        error: { 
+          code: "DATABASE_ERROR", 
+          message: error.message 
+        } 
+      }, { status: 400 });
     }
 
     return NextResponse.json({ shippingMethods });
   } catch (err: any) {
     console.error(`[HEADLESS SHIPPING METHODS ERROR]`, err);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ 
+      error: { 
+        code: "INTERNAL_SERVER_ERROR", 
+        message: "An unexpected error occurred while fetching shipping methods." 
+      } 
+    }, { status: 500 });
   }
 }

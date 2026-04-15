@@ -173,6 +173,7 @@ export interface Product {
   id: string;
   store_id: string;
   name: string;
+  slug: string | null;
   description: string | null;
   price: number;
   compare_at_price: number | null;
@@ -321,6 +322,7 @@ export interface Category {
   name: string;
   slug: string;
   description: string | null;
+  image_url?: string | null;
   parent_id: string | null;
   sort_order: number;
   active: boolean;

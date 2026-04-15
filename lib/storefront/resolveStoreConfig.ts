@@ -36,7 +36,7 @@ export async function resolveStorefront(
       .limit(200),
     supabase
       .from("categories")
-      .select("id, name, slug")
+      .select("id, name, slug, image_url")
       .eq("store_id", config.store.id)
       .order("name"),
     supabase

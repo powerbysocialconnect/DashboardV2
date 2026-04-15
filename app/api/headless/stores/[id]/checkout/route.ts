@@ -55,12 +55,12 @@ export async function POST(
       }
     }
 
-    // 3. Prepare line items for Stripe
+    // 3. Prepare line items for Stripe and validate stock
     const lineItems = [];
     for (const item of items) {
       const { data: product } = await supabase
         .from("products")
-        .select("name, price, image_urls, variants")
+        .select("name, price, image_urls, variants, stock")
         .eq("id", item.productId)
         .single();
 
@@ -70,6 +70,19 @@ export async function POST(
           ? product.variants?.find((v: any) => v.id === item.variantId) 
           : null;
         
+        // Stock Validation
+        const availableStock = variant ? (variant.stock ?? 0) : (product.stock ?? 0);
+        const requestedQuantity = item.quantity || 1;
+
+        if (availableStock < requestedQuantity) {
+          return NextResponse.json({
+            error: {
+              code: "OUT_OF_STOCK",
+              message: `Not enough stock for ${product.name}${variant ? ` - ${variant.name}` : ''}. Available: ${availableStock}`
+            }
+          }, { status: 400 });
+        }
+
         const price = variant ? variant.price : product.price;
         const name = variant ? `${product.name} - ${variant.name}` : product.name;
 
@@ -86,8 +99,15 @@ export async function POST(
             },
             unit_amount: Math.round(price * 100),
           },
-          quantity: item.quantity || 1,
+          quantity: requestedQuantity,
         });
+      } else {
+        return NextResponse.json({
+          error: {
+            code: "PRODUCT_NOT_FOUND",
+            message: `Product with ID ${item.productId} was not found.`
+          }
+        }, { status: 404 });
       }
     }
 
@@ -106,7 +126,21 @@ export async function POST(
         const subtotal = lineItems.reduce((acc, item) => acc + (item.price_data.unit_amount * item.quantity), 0) / 100;
         if (!discount.min_order_amount || subtotal >= discount.min_order_amount) {
           couponId = discount.stripe_coupon_id;
+        } else {
+          return NextResponse.json({
+            error: {
+              code: "DISCOUNT_MIN_AMOUNT_NOT_MET",
+              message: `Discount code requires a minimum order of ${discount.min_order_amount}`
+            }
+          }, { status: 400 });
         }
+      } else if (discount_code) {
+        return NextResponse.json({
+          error: {
+            code: "INVALID_DISCOUNT_CODE",
+            message: "The discount code provided is invalid or expired."
+          }
+        }, { status: 400 });
       }
     }
 
@@ -145,7 +179,12 @@ export async function POST(
   } catch (err: any) {
     console.error("[headless-checkout-error]", err);
     return NextResponse.json(
-      { error: err.message || "Internal Server Error" },
+      { 
+        error: { 
+          code: "INTERNAL_SERVER_ERROR", 
+          message: err.message || "An unexpected error occurred during checkout creation." 
+        } 
+      },
       { status: 500 }
     );
   }

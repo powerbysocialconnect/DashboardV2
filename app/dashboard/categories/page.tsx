@@ -52,9 +52,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Tag, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Tag, Loader2, ImageIcon } from "lucide-react";
 import type { Category, Store } from "@/types/database";
 import { toast } from "sonner";
+import { ImageUpload } from "@/components/dashboard/ImageUpload";
 
 export default function CategoriesPage() {
   const [loading, setLoading] = useState(true);
@@ -65,6 +66,7 @@ export default function CategoriesPage() {
     name: "",
     slug: "",
     description: "",
+    image_url: "" as string | null,
     parent_id: "none",
     sort_order: "1",
     active: true,
@@ -148,6 +150,7 @@ export default function CategoriesPage() {
       name: formData.name.trim(),
       slug: formData.slug.trim() || generateSlug(formData.name),
       description: formData.description.trim() || null,
+      image_url: formData.image_url || null,
       parent_id: formData.parent_id === "none" ? null : formData.parent_id,
       sort_order: parseInt(formData.sort_order) || 1,
       active: formData.active,
@@ -161,6 +164,7 @@ export default function CategoriesPage() {
         name: "",
         slug: "",
         description: "",
+        image_url: null,
         parent_id: "none",
         sort_order: "1",
         active: true,
@@ -181,6 +185,7 @@ export default function CategoriesPage() {
         name: formData.name.trim(),
         slug: formData.slug.trim(),
         description: formData.description.trim() || null,
+        image_url: formData.image_url || null,
         parent_id: formData.parent_id === "none" ? null : formData.parent_id,
         sort_order: parseInt(formData.sort_order) || 1,
         active: formData.active,
@@ -294,6 +299,14 @@ export default function CategoriesPage() {
                 />
               </div>
               <div className="space-y-2">
+                <Label>Category Image (Optional)</Label>
+                <ImageUpload
+                  value={formData.image_url ? [formData.image_url] : []}
+                  onChange={(urls) => setFormData({ ...formData, image_url: urls[0] || null })}
+                  onRemove={() => setFormData({ ...formData, image_url: null })}
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="parent">Parent Category</Label>
                 <Select
                   value={formData.parent_id}
@@ -374,8 +387,17 @@ export default function CategoriesPage() {
               <TableBody>
                 {categories.map((cat) => (
                   <TableRow key={cat.id}>
-                    <TableCell className="font-bold">
-                      {cat.parent_id && <span className="mr-2 text-muted-foreground">↳</span>}
+                    <TableCell className="font-bold flex items-center gap-3">
+                      {cat.parent_id && <span className="text-muted-foreground">↳</span>}
+                      {cat.image_url ? (
+                        <div className="h-8 w-8 rounded-md overflow-hidden bg-muted flex-shrink-0">
+                          <img src={cat.image_url} alt={cat.name} className="h-full w-full object-cover" />
+                        </div>
+                      ) : (
+                        <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+                          <ImageIcon className="h-4 w-4 text-muted-foreground/50" />
+                        </div>
+                      )}
                       {cat.name}
                     </TableCell>
                     <TableCell className="text-muted-foreground font-mono text-xs">{cat.slug}</TableCell>
@@ -399,6 +421,7 @@ export default function CategoriesPage() {
                               name: cat.name,
                               slug: cat.slug,
                               description: cat.description || "",
+                              image_url: cat.image_url || null,
                               parent_id: cat.parent_id || "none",
                               sort_order: (cat.sort_order || 1).toString(),
                               active: cat.active,
@@ -482,6 +505,14 @@ export default function CategoriesPage() {
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Category Image (Optional)</Label>
+              <ImageUpload
+                value={formData.image_url ? [formData.image_url] : []}
+                onChange={(urls) => setFormData({ ...formData, image_url: urls[0] || null })}
+                onRemove={() => setFormData({ ...formData, image_url: null })}
               />
             </div>
             <div className="space-y-2">

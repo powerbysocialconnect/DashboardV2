@@ -11,14 +11,32 @@ export default function CategoryGrid({
   section,
   settings,
   className,
-}: CategoryGridProps) {
+  categories = [],
+}: CategoryGridProps & { categories?: any[] }) {
   const items = (section.items || []) as Array<{
     name?: string;
     imageUrl?: string;
     url?: string;
+    categoryId?: string;
   }>;
 
   if (items.length === 0) return null;
+
+  // Enhance items with real category data if available
+  const enhancedItems = items.map(item => {
+    if (item.categoryId) {
+      const category = categories.find(c => c.id === item.categoryId);
+      if (category) {
+        return {
+          ...item,
+          name: item.name || category.name,
+          imageUrl: item.imageUrl || category.image_url,
+          url: item.url || `/collections/${category.slug}`
+        };
+      }
+    }
+    return item;
+  });
 
   return (
     <section
@@ -47,7 +65,7 @@ export default function CategoryGrid({
         )}
 
         <div className="mt-10 grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3">
-          {items.map((item, index) => (
+          {enhancedItems.map((item, index) => (
             <a
               key={index}
               href={item.url || "#"}

@@ -12,41 +12,45 @@ export interface PlanDefinition {
     analytics: boolean;
     discountCodes: boolean;
     multipleImages: boolean;
+    blogSupport?: boolean;
+    customDesign?: boolean;
   };
   priceMonthly: number;
   priceYearly: number;
   trialDays: number;
   /** Percentage fee taken from each sale (0 = no fee) */
   transactionFeePercent: number;
+  isOneTime?: boolean;
 }
 
 export const PLANS: Record<string, PlanDefinition> = {
-  pixeowelcome: {
-    name: "pixeowelcome",
-    displayName: "PixeoWelcome",
-    maxProducts: 50,
-    maxOrdersPerMonth: 500,
-    maxStorageMb: 1000,
+  launch: {
+    name: "launch",
+    displayName: "🚀 Launch Store",
+    maxProducts: 25, 
+    maxOrdersPerMonth: null,
+    maxStorageMb: 2000,
     features: {
       customDomain: false,
-      themeCustomization: true,
+      themeCustomization: false,
       premiumThemes: false,
       prioritySupport: false,
-      analytics: true,
+      analytics: false,
       discountCodes: true,
       multipleImages: true,
     },
-    priceMonthly: 0,
-    priceYearly: 0,
+    priceMonthly: 1, // One-time £1 represented here
+    priceYearly: 1,
     trialDays: 0,
-    transactionFeePercent: 2.5,
+    transactionFeePercent: 0,
+    isOneTime: true,
   },
-  "🌱 starter store": {
-    name: "🌱 Starter Store",
+  starter: {
+    name: "starter",
     displayName: "🌱 Starter Store",
-    maxProducts: 100,
-    maxOrdersPerMonth: 100,
-    maxStorageMb: 500,
+    maxProducts: 50,
+    maxOrdersPerMonth: null,
+    maxStorageMb: 5000,
     features: {
       customDomain: false,
       themeCustomization: true,
@@ -56,37 +60,17 @@ export const PLANS: Record<string, PlanDefinition> = {
       discountCodes: true,
       multipleImages: true,
     },
-    priceMonthly: 19,
-    priceYearly: 190,
+    priceMonthly: 10,
+    priceYearly: 100,
     trialDays: 14,
     transactionFeePercent: 0,
   },
-  "starter store": {
-    name: "Starter Store",
-    displayName: "Starter Store",
-    maxProducts: 100,
-    maxOrdersPerMonth: 100,
-    maxStorageMb: 500,
-    features: {
-      customDomain: false,
-      themeCustomization: true,
-      premiumThemes: false,
-      prioritySupport: false,
-      analytics: false,
-      discountCodes: true,
-      multipleImages: true,
-    },
-    priceMonthly: 19,
-    priceYearly: 190,
-    trialDays: 14,
-    transactionFeePercent: 0,
-  },
-  "💎 premium store": {
-    name: "💎 Premium Store",
+  premium: {
+    name: "premium",
     displayName: "💎 Premium Store",
-    maxProducts: 250,
-    maxOrdersPerMonth: 1000,
-    maxStorageMb: 5000,
+    maxProducts: 100,
+    maxOrdersPerMonth: null,
+    maxStorageMb: 10000,
     features: {
       customDomain: true,
       themeCustomization: true,
@@ -96,35 +80,15 @@ export const PLANS: Record<string, PlanDefinition> = {
       discountCodes: true,
       multipleImages: true,
     },
-    priceMonthly: 49,
-    priceYearly: 490,
+    priceMonthly: 14.99,
+    priceYearly: 149.9,
     trialDays: 14,
     transactionFeePercent: 0,
   },
-  "premium store": {
-    name: "Premium Store",
-    displayName: "Premium Store",
-    maxProducts: 250,
-    maxOrdersPerMonth: 1000,
-    maxStorageMb: 5000,
-    features: {
-      customDomain: true,
-      themeCustomization: true,
-      premiumThemes: true,
-      prioritySupport: false,
-      analytics: true,
-      discountCodes: true,
-      multipleImages: true,
-    },
-    priceMonthly: 49,
-    priceYearly: 490,
-    trialDays: 14,
-    transactionFeePercent: 0,
-  },
-  "🔧 store maintenance": {
-    name: "🔧 Store Maintenance",
+  maintenance: {
+    name: "maintenance",
     displayName: "🔧 Store Maintenance",
-    maxProducts: 500,
+    maxProducts: -1,
     maxOrdersPerMonth: null,
     maxStorageMb: 50000,
     features: {
@@ -136,17 +100,17 @@ export const PLANS: Record<string, PlanDefinition> = {
       discountCodes: true,
       multipleImages: true,
     },
-    priceMonthly: 79,
-    priceYearly: 790,
+    priceMonthly: 35,
+    priceYearly: 350,
     trialDays: 0,
     transactionFeePercent: 0,
   },
-  "store maintenance": {
-    name: "Store Maintenance",
-    displayName: "Store Maintenance",
-    maxProducts: 500,
+  pro: {
+    name: "pro",
+    displayName: "🏆 Pro Store",
+    maxProducts: -1,
     maxOrdersPerMonth: null,
-    maxStorageMb: 50000,
+    maxStorageMb: 100000,
     features: {
       customDomain: true,
       themeCustomization: true,
@@ -155,9 +119,32 @@ export const PLANS: Record<string, PlanDefinition> = {
       analytics: true,
       discountCodes: true,
       multipleImages: true,
+      blogSupport: true,
     },
-    priceMonthly: 79,
-    priceYearly: 790,
+    priceMonthly: 40,
+    priceYearly: 400,
+    trialDays: 14,
+    transactionFeePercent: 0,
+  },
+  custom: {
+    name: "custom",
+    displayName: "✨ Custom Store",
+    maxProducts: -1,
+    maxOrdersPerMonth: null,
+    maxStorageMb: 500000,
+    features: {
+      customDomain: true,
+      themeCustomization: true,
+      premiumThemes: true,
+      prioritySupport: true,
+      analytics: true,
+      discountCodes: true,
+      multipleImages: true,
+      blogSupport: true,
+      customDesign: true,
+    },
+    priceMonthly: 200,
+    priceYearly: 2000,
     trialDays: 0,
     transactionFeePercent: 0,
   },
@@ -165,7 +152,17 @@ export const PLANS: Record<string, PlanDefinition> = {
 
 export function getPlan(planName: string | null | undefined): PlanDefinition {
   if (!planName) return PLANS.starter;
-  return PLANS[planName.toLowerCase()] || PLANS.starter;
+  
+  const normalized = planName.toLowerCase();
+  
+  if (normalized.includes("launch")) return PLANS.launch;
+  if (normalized.includes("starter")) return PLANS.starter;
+  if (normalized.includes("premium")) return PLANS.premium;
+  if (normalized.includes("maintenance")) return PLANS.maintenance;
+  if (normalized.includes("pro")) return PLANS.pro;
+  if (normalized.includes("custom")) return PLANS.custom;
+  
+  return PLANS[normalized] || PLANS.starter;
 }
 
 export function getTrialDaysRemaining(
@@ -191,4 +188,3 @@ export function isTrialExpiringSoon(
   if (remaining === null) return false;
   return remaining > 0 && remaining <= daysThreshold;
 }
-

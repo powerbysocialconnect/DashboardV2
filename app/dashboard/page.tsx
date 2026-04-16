@@ -376,7 +376,11 @@ export default function DashboardPage() {
           </div>
           <Button variant="outline" size="sm" asChild>
             <a
-              href={`/store/${store.subdomain}`}
+              href={
+                store.custom_storefront_url 
+                  ? (store.custom_storefront_url.startsWith('http') ? store.custom_storefront_url : `https://${store.custom_storefront_url}`)
+                  : `/store/${store.subdomain}`
+              }
               target="_blank"
               rel="noopener noreferrer"
             >

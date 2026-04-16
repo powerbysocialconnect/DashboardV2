@@ -97,6 +97,7 @@ export interface Store {
   footer_headline: string | null;
   footer_description: string | null;
   onboarding_completed: boolean;
+  custom_storefront_url: string | null;
   created_at: string;
   updated_at: string;
 }

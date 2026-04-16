@@ -143,6 +143,7 @@ export default function StoreDetailPage() {
   const [footerHeadline, setFooterHeadline] = useState("");
   const [footerDescription, setFooterDescription] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [customStorefrontUrl, setCustomStorefrontUrl] = useState("");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -257,6 +258,7 @@ export default function StoreDetailPage() {
       setFooterHeadline(fHeadline);
       setFooterDescription(fDescription);
       setLogoUrl((storeData as unknown as Store).logo_url || "");
+      setCustomStorefrontUrl((storeData as unknown as Store).custom_storefront_url || "");
 
       const actions = await getStoreActions(supabase, storeId);
       setAdminActions(actions as typeof adminActions);
@@ -384,6 +386,7 @@ export default function StoreDetailPage() {
         footer_headline: footerHeadline || null,
         footer_description: footerDescription || null,
         logo_url: logoUrl || null,
+        custom_storefront_url: customStorefrontUrl || null,
       };
       
       const { error: updateError } = await supabase
@@ -680,9 +683,19 @@ export default function StoreDetailPage() {
               </h1>
               <StoreStatusBadge status={store.status} />
             </div>
-            <p className="text-sm text-muted-foreground">
-              {store.subdomain}.pixeocommerce.com
-            </p>
+            <a 
+              href={
+                store.custom_storefront_url 
+                  ? (store.custom_storefront_url.startsWith('http') ? store.custom_storefront_url : `https://${store.custom_storefront_url}`)
+                  : `https://${store.subdomain}.pixeocommerce.com`
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1 group"
+            >
+              {store.custom_storefront_url || `${store.subdomain}.pixeocommerce.com`}
+              <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </a>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -1465,15 +1478,33 @@ export default function StoreDetailPage() {
               {/* Footer Content */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Footer Editorial
-                  </CardTitle>
+                  <CardTitle className="text-lg">Storefront Links & Overrides</CardTitle>
                   <CardDescription>
-                    The brand story and headline displayed at the center of the footer.
+                    Configure where your store is hosted and basic branding.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Custom Storefront URL (Headless)</label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="e.g. nyla-clothing.vercel.app"
+                        value={customStorefrontUrl}
+                        onChange={(e) => setCustomStorefrontUrl(e.target.value)}
+                      />
+                      {customStorefrontUrl && (
+                        <Button variant="outline" size="icon" asChild>
+                          <a href={customStorefrontUrl.startsWith('http') ? customStorefrontUrl : `https://${customStorefrontUrl}`} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground italic">
+                      If set, all &quot;Visit Store&quot; links in the dashboard will point here instead of the Pixeocommerce subdomain.
+                    </p>
+                  </div>
+
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Footer Headline</label>
                     <Input

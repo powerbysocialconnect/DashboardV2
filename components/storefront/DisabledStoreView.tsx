@@ -12,9 +12,11 @@ export default function DisabledStoreView({ storeName }: DisabledStoreViewProps)
       <div className="max-w-2xl w-full">
         {/* Logo/Header */}
         <div className="flex justify-center mb-12">
-          <div className="h-12 w-12 bg-black rounded-xl flex items-center justify-center">
-            <div className="h-6 w-6 border-2 border-white rounded-sm rotate-45" />
-          </div>
+          <img 
+            src="/pimain2.png" 
+            alt="Pixeo Logo" 
+            className="h-12 w-auto object-contain"
+          />
         </div>
 
         <div className="bg-white rounded-[32px] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] overflow-hidden border border-black/[0.03]">

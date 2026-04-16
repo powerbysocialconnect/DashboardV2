@@ -324,9 +324,11 @@ export default function StoreDetailPage() {
     setActionLoading(true);
     try {
       await disableStore(supabase, store.id, currentUserId, "Disabled via admin panel");
+      toast.success("Store disabled successfully");
       await fetchStore();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Disable failed:", err);
+      toast.error(err.message || "Failed to disable store");
     } finally {
       setActionLoading(false);
     }
@@ -418,9 +420,11 @@ export default function StoreDetailPage() {
     setActionLoading(true);
     try {
       await enableStore(supabase, store.id, currentUserId);
+      toast.success("Store enabled successfully");
       await fetchStore();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Enable failed:", err);
+      toast.error(err.message || "Failed to enable store");
     } finally {
       setActionLoading(false);
     }
@@ -681,7 +685,7 @@ export default function StoreDetailPage() {
               <h1 className="text-2xl font-bold tracking-tight">
                 {store.name}
               </h1>
-              <StoreStatusBadge status={store.status} />
+              <StoreStatusBadge status={store.is_disabled ? "disabled" : store.status} />
             </div>
             <a 
               href={
@@ -1642,17 +1646,17 @@ export default function StoreDetailPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  {store.status === "disabled" ? (
-                    <Power className="h-5 w-5" />
+                  {store.status === "disabled" || store.is_disabled ? (
+                    <Power className="h-5 w-5 text-blue-500" />
                   ) : (
                     <PowerOff className="h-5 w-5" />
                   )}
-                  {store.status === "disabled" ? "Enable" : "Disable"} Store
+                  {store.status === "disabled" || store.is_disabled ? "Enable" : "Disable"} Store
                 </CardTitle>
                 <CardDescription>
-                  {store.status === "disabled"
-                    ? "Re-enable this store and restore access"
-                    : "Completely disable this store. It will be inaccessible."}
+                  {store.status === "disabled" || store.is_disabled
+                    ? "Re-enable this store and restore access to the storefront."
+                    : "Completely disable this store. It will be inaccessible to all users."}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1661,11 +1665,11 @@ export default function StoreDetailPage() {
                     <Button
                       className="w-full"
                       variant={
-                        store.status === "disabled" ? "default" : "destructive"
+                        (store.status === "disabled" || store.is_disabled) ? "default" : "destructive"
                       }
                       disabled={actionLoading}
                     >
-                      {store.status === "disabled" ? (
+                      {store.status === "disabled" || store.is_disabled ? (
                         <>
                           <Power className="mr-2 h-4 w-4" />
                           Enable Store
@@ -1681,26 +1685,27 @@ export default function StoreDetailPage() {
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>
-                        {store.status === "disabled"
+                        {store.status === "disabled" || store.is_disabled
                           ? "Enable Store?"
                           : "Disable Store?"}
                       </AlertDialogTitle>
                       <AlertDialogDescription>
-                        {store.status === "disabled"
-                          ? `This will re-enable "${store.name}" and set it back to live status.`
-                          : `This will completely disable "${store.name}". The store will be inaccessible to everyone including the owner.`}
+                        {store.status === "disabled" || store.is_disabled
+                          ? `This will re-enable "${store.name}" and restore access for customers and the merchant.`
+                          : `This will completely disable "${store.name}". The storefront will show a maintenance/billing notice and be inaccessible.`}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
                       <AlertDialogAction
+                        className={!(store.status === "disabled" || store.is_disabled) ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
                         onClick={
-                          store.status === "disabled"
+                          (store.status === "disabled" || store.is_disabled)
                             ? handleEnable
                             : handleDisable
                         }
                       >
-                        {store.status === "disabled" ? "Enable" : "Disable"}
+                        {store.status === "disabled" || store.is_disabled ? "Enable" : "Disable"}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>

@@ -255,7 +255,24 @@ export default function CategoriesPage() {
           </p>
         </div>
         
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <Dialog 
+          open={isAddDialogOpen} 
+          onOpenChange={(open) => {
+            if (open) {
+              setFormData({
+                name: "",
+                slug: "",
+                description: "",
+                image_url: null,
+                parent_id: "none",
+                sort_order: "1",
+                active: true,
+              });
+              setEditingCategory(null);
+            }
+            setIsAddDialogOpen(open);
+          }}
+        >
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />

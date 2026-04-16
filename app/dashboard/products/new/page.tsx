@@ -35,8 +35,9 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { ArrowLeft, Plus, X, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, X, Loader2, Trash2 } from "lucide-react";
 import { ImageUpload } from "@/components/dashboard/ImageUpload";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { toast } from "sonner";
 import type { Category, Store } from "@/types/database";
 
@@ -51,6 +52,7 @@ const productSchema = z.object({
     .or(z.literal("").transform(() => undefined)),
   stock_quantity: z.coerce.number().int().min(0, "Stock must be non-negative"),
   category_id: z.string().optional().or(z.literal("")),
+  category_ids: z.array(z.string()).default([]),
   images: z.array(z.object({ url: z.string().url("Must be a valid URL") })),
   variants: z.array(
     z.object({
@@ -116,6 +118,7 @@ export default function CreateProductPage() {
       compare_at_price: undefined,
       stock_quantity: 0,
       category_id: "",
+      category_ids: [],
       images: [],
       variants: [],
       is_active: true,
@@ -185,19 +188,23 @@ export default function CreateProductPage() {
         }))
       : null;
 
-    const { error } = await supabase.from("products").insert({
-      store_id: store.id,
-      name: values.name,
-      description: values.description || null,
-      price: values.price,
-      compare_at_price: values.compare_at_price || null,
-      stock: values.stock_quantity,
-      category_id: (values.category_id && values.category_id !== "") ? values.category_id : null,
-      image_url: values.images?.[0]?.url || null,
-      image_urls: values.images.map((img) => img.url),
-      variants,
-      active: values.is_active,
-    });
+    const { data: product, error } = await supabase
+      .from("products")
+      .insert({
+        store_id: store.id,
+        name: values.name,
+        description: values.description || null,
+        price: values.price,
+        compare_at_price: values.compare_at_price || null,
+        stock: values.stock_quantity,
+        category_id: values.category_ids?.[0] || null,
+        image_url: values.images?.[0]?.url || null,
+        image_urls: values.images.map((img) => img.url),
+        variants,
+        active: values.is_active,
+      })
+      .select("id")
+      .single();
 
     if (error) {
       console.error("Product creation error:", error);
@@ -206,8 +213,16 @@ export default function CreateProductPage() {
       return;
     }
 
-    toast.success("Product created!");
+    // Insert categories
+    if (values.category_ids && values.category_ids.length > 0) {
+      const categoryLinks = values.category_ids.map((catId) => ({
+        product_id: product.id,
+        category_id: catId,
+      }));
+      await supabase.from("product_categories").insert(categoryLinks);
+    }
 
+    toast.success("Product created!");
     router.push("/dashboard/products");
   };
 
@@ -463,28 +478,21 @@ export default function CreateProductPage() {
                 <CardContent className="space-y-4">
                   <FormField
                     control={form.control}
-                    name="category_id"
+                    name="category_ids"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Category</FormLabel>
-                        <Select
-                          value={field.value || ""}
-                          onValueChange={field.onChange}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a category" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {categories.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.id}>
-                                {cat.parent_id && <span className="mr-1 opacity-50">↳</span>}
-                                {cat.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormLabel>Categories</FormLabel>
+                        <FormControl>
+                          <MultiSelect
+                            options={categories.map((cat) => ({
+                              label: cat.name,
+                              value: cat.id,
+                            }))}
+                            selected={field.value || []}
+                            onChange={(vals) => field.onChange(vals)}
+                            placeholder="Select categories"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}

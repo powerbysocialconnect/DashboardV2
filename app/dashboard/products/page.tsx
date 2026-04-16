@@ -93,7 +93,7 @@ export default function ProductsPage() {
 
       let query = supabase
         .from("products")
-        .select("*", { count: "exact" })
+        .select("*, product_categories(categories(name))", { count: "exact" })
         .eq("store_id", storeId)
         .order("created_at", { ascending: false })
         .range(from, to);
@@ -185,9 +185,12 @@ export default function ProductsPage() {
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
-  const getCategoryName = (categoryId: string | null) => {
-    if (!categoryId) return "—";
-    const cat = categories.find((c) => c.id === categoryId);
+  const getCategoryNames = (product: any) => {
+    const pcs = product.product_categories || [];
+    if (pcs.length > 0) {
+      return pcs.map((pc: any) => pc.categories?.name).filter(Boolean).join(", ");
+    }
+    const cat = categories.find((c) => c.id === product.category_id);
     return cat?.name ?? "—";
   };
 
@@ -335,7 +338,7 @@ export default function ProductsPage() {
                         </span>
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
-                        {getCategoryName(product.category_id)}
+                        {getCategoryNames(product)}
                       </TableCell>
                       <TableCell>
                         <Badge

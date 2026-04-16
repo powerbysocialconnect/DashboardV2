@@ -187,6 +187,16 @@ export interface Product {
   stripe_price_id: string | null;
   created_at: string;
   updated_at: string;
+  // Joined fields
+  category_ids?: string[];
+  categories?: Category[];
+}
+
+export interface ProductCategory {
+  id: string;
+  product_id: string;
+  category_id: string;
+  created_at: string;
 }
 
 export interface ProductVariant {

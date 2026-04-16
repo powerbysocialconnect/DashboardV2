@@ -47,6 +47,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Plus, X, Loader2, Trash2 } from "lucide-react";
 import { ImageUpload } from "@/components/dashboard/ImageUpload";
+import { MultiSelect } from "@/components/ui/multi-select";
+import { toast } from "sonner";
 import type { Product, Category, Store } from "@/types/database";
 
 const productSchema = z.object({
@@ -58,8 +60,9 @@ const productSchema = z.object({
     .min(0)
     .optional()
     .or(z.literal("").transform(() => undefined)),
-  stock_quantity: z.coerce.number().int().min(0, "Stock must be non-negative"),
+  stock_quantity: z.coerce.number().int().min(0, "Stock must-be non-negative"),
   category_id: z.string().optional().or(z.literal("")),
+  category_ids: z.array(z.string()).default([]),
   images: z.array(z.object({ url: z.string().url("Must be a valid URL") })),
   variants: z.array(
     z.object({
@@ -141,6 +144,7 @@ export default function EditProductPage() {
       compare_at_price: undefined,
       stock_quantity: 0,
       category_id: "",
+      category_ids: [],
       images: [],
       variants: [],
       is_active: true,
@@ -188,7 +192,7 @@ export default function EditProductPage() {
       const [productResult, catsResult] = await Promise.all([
         supabase
           .from("products")
-          .select("*")
+          .select("*, product_categories(category_id)")
           .eq("id", productId)
           .eq("store_id", currentStore.id)
           .single(),
@@ -208,8 +212,12 @@ export default function EditProductPage() {
         return;
       }
 
-      const prod = productResult.data as Product;
+      const prod = productResult.data as any;
       setProduct(prod);
+
+      const linkedCategoryIds = (prod.product_categories || []).map(
+        (pc: any) => pc.category_id
+      );
 
       form.reset({
         name: prod.name,
@@ -218,8 +226,9 @@ export default function EditProductPage() {
         compare_at_price: prod.compare_at_price ?? undefined,
         stock_quantity: prod.stock,
         category_id: prod.category_id || "",
-        images: (prod.image_urls || []).map((url) => ({ url })),
-        variants: (prod.variants || []).map((v) => ({
+        category_ids: linkedCategoryIds.length > 0 ? linkedCategoryIds : (prod.category_id ? [prod.category_id] : []),
+        images: (prod.image_urls || []).map((url: string) => ({ url })),
+        variants: (prod.variants || []).map((v: any) => ({
           id: (v as any).id,
           name: v.name,
           price: (v as any).price || prod.price,
@@ -256,7 +265,7 @@ export default function EditProductPage() {
         price: values.price,
         compare_at_price: values.compare_at_price || null,
         stock: values.stock_quantity,
-        category_id: (values.category_id && values.category_id !== "") ? values.category_id : null,
+        category_id: values.category_ids?.[0] || null,
         image_url: values.images?.[0]?.url || null,
         image_urls: values.images.map((img) => img.url),
         variants,
@@ -271,6 +280,23 @@ export default function EditProductPage() {
       return;
     }
 
+    // Update product categories
+    // 1. Delete existing
+    await supabase
+      .from("product_categories")
+      .delete()
+      .eq("product_id", product.id);
+
+    // 2. Insert new ones
+    if (values.category_ids && values.category_ids.length > 0) {
+      const categoryLinks = values.category_ids.map((catId) => ({
+        product_id: product.id,
+        category_id: catId,
+      }));
+      await supabase.from("product_categories").insert(categoryLinks);
+    }
+
+    toast.success("Product updated successfully");
     router.push("/dashboard/products");
   };
 
@@ -601,28 +627,21 @@ export default function EditProductPage() {
                 <CardContent className="space-y-4">
                   <FormField
                     control={form.control}
-                    name="category_id"
+                    name="category_ids"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Category</FormLabel>
-                        <Select
-                          value={field.value || ""}
-                          onValueChange={field.onChange}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a category" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {categories.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.id}>
-                                {cat.parent_id && <span className="mr-1 opacity-50">↳</span>}
-                                {cat.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormLabel>Categories</FormLabel>
+                        <FormControl>
+                          <MultiSelect
+                            options={categories.map((cat) => ({
+                              label: cat.name,
+                              value: cat.id,
+                            }))}
+                            selected={field.value || []}
+                            onChange={(vals) => field.onChange(vals)}
+                            placeholder="Select categories"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}

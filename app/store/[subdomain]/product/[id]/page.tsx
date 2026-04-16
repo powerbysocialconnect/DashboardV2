@@ -61,7 +61,7 @@ export default async function ProductPage({ params }: PageProps) {
   const [{ data: product }, { data: products }, { data: headerPages }, { data: footerPages }] = await Promise.all([
     supabase
       .from("products")
-      .select("*, categories(name)")
+      .select("*, categories(name), product_categories(categories(name))")
       .eq("id", params.id)
       .eq("store_id", store.id)
       .eq("active", true)
@@ -219,12 +219,14 @@ export default async function ProductPage({ params }: PageProps) {
                  
                  <div className="mt-8 pt-8 border-t border-black/[0.05]">
                     <p className="text-[12px] text-gray-400">
-                      Category: <span className="text-gray-500 font-medium">
+                    Categories: <span className="text-gray-500 font-medium">
                         {(() => {
                           const p = product as any;
-                          const catData = p.categories || p.category;
-                          if (Array.isArray(catData)) return catData[0]?.name || 'Uncategorized';
-                          return catData?.name || 'Uncategorized';
+                          const pcs = p.product_categories || [];
+                          if (pcs.length > 0) {
+                            return pcs.map((pc: any) => pc.categories?.name).filter(Boolean).join(", ");
+                          }
+                          return p.categories?.name || 'Uncategorized';
                         })()}
                       </span>
                     </p>

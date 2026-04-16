@@ -45,20 +45,54 @@ export default async function CollectionPage({
   const offset = (currentPage - 1) * ITEMS_PER_PAGE;
 
   // Fetch paginated products
-  // If collection is not "all", we might filter by category, but for now focus on "all"
   let query = supabase
     .from("products")
-    .select("*", { count: "exact" })
+    .select("*, product_categories!inner(category_id)", { count: "exact" })
     .eq("store_id", store.id)
     .eq("active", true)
-    .order("created_at", { ascending: false })
-    .range(offset, offset + ITEMS_PER_PAGE - 1);
+    .order("created_at", { ascending: false });
 
-  const { data: products, count } = await query;
+  if (params.collection !== "all") {
+    const { data: category } = await supabase
+      .from("categories")
+      .select("id")
+      .eq("store_id", store.id)
+      .eq("slug", params.collection)
+      .single();
+
+    if (category) {
+      query = query.eq("product_categories.category_id", category.id);
+    } else {
+      // If collection slug doesn't exist as a category, return empty or notFound
+      return notFound();
+    }
+  } else {
+    // If "all", we still need to join but without the filter, OR we can use a different select
+    // To handle "all" without needing product_categories entries (backwards compatibility), 
+    // we use a simpler select if collection is "all"
+    query = supabase
+      .from("products")
+      .select("*", { count: "exact" })
+      .eq("store_id", store.id)
+      .eq("active", true)
+      .order("created_at", { ascending: false });
+  }
+
+  const { data: products, count } = await query.range(offset, offset + ITEMS_PER_PAGE - 1);
 
   const totalProducts = count || 0;
   const totalPages = Math.ceil(totalProducts / ITEMS_PER_PAGE);
-  const collectionTitle = params.collection === "all" ? "Shop All" : params.collection;
+
+  // Get collection title
+  let collectionTitle = "Shop All";
+  if (params.collection !== "all") {
+    const { data: cat } = await supabase
+      .from("categories")
+      .select("name")
+      .eq("slug", params.collection)
+      .single();
+    if (cat) collectionTitle = cat.name;
+  }
 
   return (
     <CoreLayout

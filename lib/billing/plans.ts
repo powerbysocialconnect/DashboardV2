@@ -41,7 +41,7 @@ export const PLANS: Record<string, PlanDefinition> = {
     },
     priceMonthly: 1, // One-time £1 represented here
     priceYearly: 1,
-    trialDays: 0,
+    trialDays: 90,
     transactionFeePercent: 0,
     isOneTime: true,
   },

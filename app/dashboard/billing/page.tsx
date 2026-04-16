@@ -36,56 +36,65 @@ import {
 const PLAN_FEATURES = [
   {
     feature: "Products",
-    starter: "Up to 100",
-    premium: "Up to 250",
-    maintenance: "Up to 500",
+    launch: "Up to 25",
+    starter: "Up to 50",
+    premium: "Up to 100",
+    maintenance: "Unlimited",
   },
   {
     feature: "Orders / month",
-    starter: "100",
-    premium: "1,000",
+    launch: "Unlimited",
+    starter: "Unlimited",
+    premium: "Unlimited",
     maintenance: "Unlimited",
   },
   {
     feature: "Storage",
-    starter: "500 MB",
-    premium: "5 GB",
+    launch: "2 GB",
+    starter: "5 GB",
+    premium: "10 GB",
     maintenance: "50 GB",
   },
   {
     feature: "Custom domain",
+    launch: false,
     starter: false,
     premium: true,
     maintenance: true,
   },
   {
-    feature: "Remove branding",
-    starter: false,
-    premium: true,
-    maintenance: true,
+    feature: "Grace Period",
+    launch: "90 Days",
+    starter: "14 Days",
+    premium: "14 Days",
+    maintenance: "---",
   },
   {
-    feature: "Priority support",
-    starter: false,
-    premium: false,
-    maintenance: true,
-  },
-  {
-    feature: "Advanced analytics",
+    feature: "Theme customization",
+    launch: false,
     starter: true,
     premium: true,
     maintenance: true,
   },
   {
-    feature: "Custom CSS",
+    feature: "Priority support",
+    launch: false,
     starter: false,
+    premium: false,
+    maintenance: true,
+  },
+  {
+    feature: "Discount Codes",
+    launch: true,
+    starter: true,
     premium: true,
     maintenance: true,
   },
   {
-    feature: "API access",
-    starter: false,
-    premium: false,
+    feature: "Multiple Images",
+    launch: true,
+    starter: true,
+    premium: true,
     maintenance: true,
   },
 ];
@@ -169,7 +178,7 @@ export default function BillingPage() {
 
   const daysLeft = trialDaysRemaining();
   const rawPlan = (billing?.plan_name || "🌱 Starter Store").toLowerCase();
-  const currentPlan = rawPlan.includes("premium") ? "premium" : rawPlan.includes("maintenance") ? "maintenance" : "starter";
+  const currentPlan = rawPlan.includes("launch") ? "launch" : rawPlan.includes("premium") ? "premium" : rawPlan.includes("maintenance") ? "maintenance" : "starter";
   const billingStatus = billing?.billing_status || null;
 
   if (loading) {
@@ -285,6 +294,16 @@ export default function BillingPage() {
                   <TableHead className="w-[200px]">Feature</TableHead>
                   <TableHead className="text-center">
                     <div className="flex flex-col items-center">
+                      <span>🚀 Launch</span>
+                      {currentPlan === "launch" && (
+                        <Badge variant="secondary" className="mt-1 text-[10px]">
+                          Current
+                        </Badge>
+                      )}
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-center">
+                    <div className="flex flex-col items-center">
                       <span>🌱 Starter</span>
                       {currentPlan === "starter" && (
                         <Badge variant="secondary" className="mt-1 text-[10px]">
@@ -321,7 +340,7 @@ export default function BillingPage() {
                     <TableCell className="font-medium">
                       {row.feature}
                     </TableCell>
-                    {(["starter", "premium", "maintenance"] as const).map((plan) => (
+                    {(["launch", "starter", "premium", "maintenance"] as const).map((plan) => (
                       <TableCell key={plan} className="text-center">
                         {typeof row[plan] === "boolean" ? (
                           row[plan] ? (
@@ -330,7 +349,7 @@ export default function BillingPage() {
                             <X className="mx-auto h-4 w-4 text-muted-foreground/40" />
                           )
                         ) : (
-                          <span className="text-sm">{row[plan]}</span>
+                          <span className="text-sm">{row[plan] || "---"}</span>
                         )}
                       </TableCell>
                     ))}

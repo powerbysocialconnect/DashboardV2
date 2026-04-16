@@ -53,7 +53,6 @@ export default async function ProductPage({ params }: PageProps) {
     .from("stores")
     .select("*")
     .eq("subdomain", params.subdomain)
-    .eq("is_disabled", false)
     .single();
 
   if (!store) notFound();

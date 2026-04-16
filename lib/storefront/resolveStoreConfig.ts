@@ -13,6 +13,7 @@ export interface StorefrontData {
   categories: { id: string; name: string; slug: string }[];
   headerPages: NavPageData[];
   footerPages: NavPageData[];
+  isDisabled?: boolean;
 }
 
 export async function resolveStorefront(
@@ -23,8 +24,17 @@ export async function resolveStorefront(
 
   if (!config) return null;
 
-  // Check if store is disabled — respect existing V1/V2 behavior
-  if (config.store.is_disabled) return null;
+  // Check if store is disabled
+  if (config.store.is_disabled) {
+    return {
+      config,
+      products: [],
+      categories: [],
+      headerPages: [],
+      footerPages: [],
+      isDisabled: true,
+    };
+  }
 
   const [productsRes, categoriesRes, headerPagesRes, footerPagesRes] = await Promise.all([
     supabase

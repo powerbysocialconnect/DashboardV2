@@ -6,6 +6,7 @@ import { resolveStorefront } from "@/lib/storefront/resolveStoreConfig";
 import ThemeRenderer from "@/components/themes/ThemeRenderer";
 import { formatCurrency } from "@/lib/utils";
 import type { Product, ThemeSettings } from "@/types/database";
+import DisabledStoreView from "@/components/storefront/DisabledStoreView";
 
 interface PageProps {
   params: { subdomain: string };
@@ -21,7 +22,12 @@ export async function generateMetadata({
     return { title: "Store Not Found" };
   }
 
-  const { config } = storefront;
+  const { config, isDisabled } = storefront;
+  
+  if (isDisabled) {
+    return { title: `Store Suspended | ${config.store.name}` };
+  }
+
   return {
     title: `${config.store.name}`,
     description: config.store.description || `Shop at ${config.store.name}`,
@@ -49,6 +55,7 @@ export default async function StorefrontPage({ params }: PageProps) {
   }
 
   const { config, products, categories, headerPages, footerPages } = storefront;
+
   const themeToUse = config.themeConfig?.theme_code || "core";
   
   console.log(`[DIAGNOSTIC] Storefront Found. Theme: ${themeToUse}. Products: ${products.length}`);

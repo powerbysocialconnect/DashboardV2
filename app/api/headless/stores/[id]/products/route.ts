@@ -18,17 +18,23 @@ export async function GET(
 
   try {
     // 1. Build the base query
-    // We include lightweight variant summaries to derive commerce status without heavy payloads
+    // We include lightweight variant summaries to derive commerce status without heavy payloads.
+    // We use !inner on product_categories when filtering by category to perform an efficient join.
     let query = supabase
       .from("products")
-      .select("id,name,description,price,compare_at_price,image_urls,stock,active,product_categories(category_id),product_variants(price,compare_at_price,stock,active)", { count: "exact" })
+      .select(`
+        id,name,description,price,compare_at_price,image_urls,stock,active,
+        ${categoryId ? 'product_categories!inner(category_id)' : 'product_categories(category_id)'},
+        product_variants(price,compare_at_price,stock,active)
+      `, { count: "exact" })
       .eq("store_id", storeId)
       .eq("active", true);
 
     // 2. Filter by category
     if (categoryId) {
-      // Support BOTH the legacy category_id column and the new multi-category junction table
-      query = query.or(`category_id.eq.${categoryId},product_categories.category_id.eq.${categoryId}`);
+      // Since products.category_id is synced to product_categories (from migration 031),
+      // filtering by the junction table covers both single and multi-category assignments.
+      query = query.eq("product_categories.category_id", categoryId);
     }
 
     // 3. Search query

@@ -92,9 +92,13 @@ export default function ProductsPage() {
       const from = pageNum * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
 
+      const select = catId && catId !== "all"
+        ? "*, product_categories!inner(category_id, categories(name)), product_variants(price, stock)"
+        : "*, product_categories(categories(name)), product_variants(price, stock)";
+
       let query = supabase
         .from("products")
-        .select("*, product_categories(categories(name)), product_variants(price, stock)", { count: "exact" })
+        .select(select, { count: "exact" })
         .eq("store_id", storeId)
         .order("created_at", { ascending: false })
         .range(from, to);
@@ -103,7 +107,8 @@ export default function ProductsPage() {
         query = query.ilike("name", `%${searchTerm.trim()}%`);
       }
       if (catId && catId !== "all") {
-        query = query.eq("category_id", catId);
+        // Use the junction table to support multi-category products
+        query = query.filter("product_categories.category_id", "eq", catId);
       }
 
       const { data, count } = await query;

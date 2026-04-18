@@ -108,7 +108,9 @@ export function CartDrawer({
                           </Link>
                           <span className="text-[12px] font-bold text-black tabular-nums">{formatPrice(item.price * item.quantity, currency)}</span>
                         </div>
-                        <p className="text-[11px] text-gray-500 mt-1">One Size / Default</p>
+                        <p className="text-[11px] text-gray-500 mt-1">
+                          {item.variant_name || "One Size / Default"}
+                        </p>
                       </div>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center border border-black/[0.1] rounded-md px-2 py-1">

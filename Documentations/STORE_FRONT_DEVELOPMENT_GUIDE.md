@@ -130,7 +130,7 @@ CREATE TABLE stores (
 );
 ```
 
-#### `products` Table
+#### `products` Table (Relational V2.0)
 ```sql
 CREATE TABLE products (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -138,23 +138,12 @@ CREATE TABLE products (
   name TEXT NOT NULL,
   description TEXT,
   price NUMERIC(10,2) NOT NULL,
-  image_url TEXT,
+  image_urls TEXT[], -- Standard array support
   stock INTEGER DEFAULT 0,
   sku TEXT,
-  category_id UUID REFERENCES categories(id),
-  variants JSONB DEFAULT '[]',
-  stripe_product_id TEXT,
-  stripe_price_id TEXT,
-  connected_stripe_product_id TEXT,
-  connected_stripe_price_id TEXT,
-  stripe_products JSONB,
-  connected_stripe_products JSONB,
-  featured BOOLEAN DEFAULT false,
-  best_seller BOOLEAN DEFAULT false,
-  new_arrival BOOLEAN DEFAULT false,
   active BOOLEAN DEFAULT true,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  -- RELATIONAL JOINS (Do not use JSON variants column)
+  -- Data is stored in product_variants & product_option_groups
 );
 ```
 
@@ -436,72 +425,55 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Process items and get Stripe price IDs
-    const itemPriceIds = [];
+    // Process items and build Stripe Line Items
+    const lineItems = [];
     
     for (const item of items) {
-      const { data: product, error: productError } = await supabase
+      // 1. Fetch relational product and variant data
+      const { data: product } = await supabase
         .from('products')
-        .select('id, name, stripe_price_id, connected_stripe_price_id, connected_stripe_products, stripe_products, variants')
+        .select(`
+          name, 
+          price, 
+          image_urls, 
+          product_variants(
+            id, 
+            price, 
+            product_variant_options(
+              product_option_values(value)
+            )
+          )
+        `)
         .eq('id', item.product_id)
         .single();
 
-      if (productError || !product) {
-        return NextResponse.json({ 
-          error: 'Product not found',
-          details: `Product ID: ${item.product_id}` 
-        }, { status: 400 });
+      if (!product) continue;
+
+      // 2. Resolve Variant and Name
+      const variant = item.variant_id 
+        ? product.product_variants.find((v: any) => v.id === item.variant_id) 
+        : null;
+      
+      let displayName = product.name;
+      if (variant) {
+        const options = variant.product_variant_options
+          .map((vo: any) => vo.product_option_values.value);
+        if (options.length > 0) displayName = `${product.name} - ${options.join(" / ")}`;
       }
 
-      let priceId = null;
-
-      // Handle variant pricing
-      if (item.variant_id) {
-        // Try connected account variants first
-        if (product.connected_stripe_products?.length > 0) {
-          const connectedVariant = product.connected_stripe_products.find(
-            (v: any) => v.variant_id === item.variant_id
-          );
-          if (connectedVariant?.connected_stripe_price_id) {
-            priceId = connectedVariant.connected_stripe_price_id;
-          }
-        }
-        
-        // Fallback to platform variants
-        if (!priceId && product.stripe_products?.length > 0) {
-          const platformVariant = product.stripe_products.find(
-            (v: any) => v.variant_id === item.variant_id
-          );
-          if (platformVariant?.stripe_price_id) {
-            priceId = platformVariant.stripe_price_id;
-          }
-        }
-      }
-
-      // Use main product price if no variant price found
-      // ✅ CORRECTED PRIORITY ORDER FOR PIXEOCOMMERCE STORES:
-      if (!priceId) {
-        // Priority 1: connected_stripe_price_id (Connected Account) - MOST COMMON for PixeoCommerce
-        if (product.connected_stripe_price_id) {
-          priceId = product.connected_stripe_price_id;
-          console.log('✅ Using connected product price:', priceId);
-        }
-        // Priority 2: stripe_price_id (Platform Account) - fallback
-        else if (product.stripe_price_id) {
-          priceId = product.stripe_price_id;
-          console.log('✅ Using platform product price:', priceId);
-        }
-      }
-
-      if (!priceId) {
-        return NextResponse.json({ 
-          error: 'Price not found for item',
-          details: `Product "${product.name}" is missing Stripe price configuration. Please add stripe_price_id or connected_stripe_price_id.`
-        }, { status: 400 });
-      }
-
-      itemPriceIds.push({
-        price: priceId,
+      // 3. Add to Stripe Line Items using dynamic Pricing
+      lineItems.push({
+        price_data: {
+          currency: store.currency.toLowerCase(),
+          product_data: {
+            name: displayName,
+            images: product.image_urls?.[0] ? [product.image_urls[0]] : [],
+            metadata: {
+              target_variant_id: item.variant_id || ""
+            }
+          },
+          unit_amount: Math.round((variant?.price || product.price) * 100),
+        },
         quantity: item.quantity
       });
     }

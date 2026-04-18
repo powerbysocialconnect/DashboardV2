@@ -44,7 +44,8 @@ export default function ProductActions({
       price: currentPrice,
       image: mainImage,
       quantity: quantity,
-      variant_id: selectedVariant?.id || null
+      variant_id: selectedVariant?.id || null,
+      variant_selections: selectedVariant?.optionValues || {}
     });
     
     // Smooth transition to show success before opening drawer

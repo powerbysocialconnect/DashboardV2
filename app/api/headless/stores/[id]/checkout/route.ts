@@ -58,50 +58,32 @@ export async function POST(
     // 3. Prepare line items for Stripe and validate stock
     const lineItems = [];
     for (const item of items) {
-      const { data: product } = await supabase
+      // Fetch relational product and variant data
+      const { data: product, error: productError } = await supabase
         .from("products")
-        .select("name, price, image_urls, variants, stock")
+        .select(`
+          name, 
+          price, 
+          image_urls, 
+          stock,
+          product_variants(
+            id, 
+            sku, 
+            price, 
+            stock, 
+            active,
+            product_variant_options(
+              product_option_values(
+                value,
+                product_option_groups(name)
+              )
+            )
+          )
+        `)
         .eq("id", item.productId)
         .single();
 
-      if (product) {
-        // Find specific variant if requested
-        const variant = item.variantId 
-          ? product.variants?.find((v: any) => v.id === item.variantId) 
-          : null;
-        
-        // Stock Validation
-        const availableStock = variant ? (variant.stock ?? 0) : (product.stock ?? 0);
-        const requestedQuantity = item.quantity || 1;
-
-        if (availableStock < requestedQuantity) {
-          return NextResponse.json({
-            error: {
-              code: "OUT_OF_STOCK",
-              message: `Not enough stock for ${product.name}${variant ? ` - ${variant.name}` : ''}. Available: ${availableStock}`
-            }
-          }, { status: 400 });
-        }
-
-        const price = variant ? variant.price : product.price;
-        const name = variant ? `${product.name} - ${variant.name}` : product.name;
-
-        lineItems.push({
-          price_data: {
-            currency: store.currency.toLowerCase() || "usd",
-            product_data: {
-              name: name,
-              images: product.image_urls?.[0] ? [product.image_urls[0]] : [],
-              metadata: {
-                supabase_product_id: item.productId,
-                supabase_variant_id: item.variantId || "",
-              },
-            },
-            unit_amount: Math.round(price * 100),
-          },
-          quantity: requestedQuantity,
-        });
-      } else {
+      if (productError || !product) {
         return NextResponse.json({
           error: {
             code: "PRODUCT_NOT_FOUND",
@@ -109,6 +91,56 @@ export async function POST(
           }
         }, { status: 404 });
       }
+
+      // Find specific variant if requested
+      const variant = item.variantId 
+        ? (product.product_variants || []).find((v: any) => v.id === item.variantId) 
+        : null;
+      
+      // Construct descriptive name
+      let displayName = product.name;
+      if (variant) {
+        const options = (variant.product_variant_options || [])
+          .map((vo: any) => vo.product_option_values?.value)
+          .filter(Boolean);
+        
+        if (options.length > 0) {
+          displayName = `${product.name} - ${options.join(" / ")}`;
+        } else if (variant.sku) {
+          displayName = `${product.name} (${variant.sku})`;
+        }
+      }
+      
+      // Stock Validation
+      const availableStock = variant ? (variant.stock ?? 0) : (product.stock ?? 0);
+      const requestedQuantity = item.quantity || 1;
+
+      if (availableStock < requestedQuantity) {
+        return NextResponse.json({
+          error: {
+            code: "OUT_OF_STOCK",
+            message: `Not enough stock for ${displayName}. Available: ${availableStock}`
+          }
+        }, { status: 400 });
+      }
+
+      const price = variant ? (variant.price || product.price) : product.price;
+
+      lineItems.push({
+        price_data: {
+          currency: store.currency.toLowerCase() || "usd",
+          product_data: {
+            name: displayName,
+            images: product.image_urls?.[0] ? [product.image_urls[0]] : [],
+            metadata: {
+              supabase_product_id: item.productId,
+              supabase_variant_id: item.variantId || "",
+            },
+          },
+          unit_amount: Math.round(price * 100),
+        },
+        quantity: requestedQuantity,
+      });
     }
 
     // 4. Handle Discount Code

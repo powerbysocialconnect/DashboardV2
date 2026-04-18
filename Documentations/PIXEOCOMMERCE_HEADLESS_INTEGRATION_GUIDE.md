@@ -156,6 +156,16 @@ The Listing API is optimized for speed and returns a lightweight summary payload
 
 ---
 
+## 10. STRIPE CHECKOUT STANDARDS
+
+To ensure variant details are preserved on customer receipts and the Stripe dashboard:
+
+1.  **Construct Descriptive Names**: Instead of just sending the product name, use the format: `Product Name - Option1 / Option2`.
+2.  **Pass Metadata**: Always include `supabase_product_id` and `supabase_variant_id` in Stripe metadata for accurate order fulfillment.
+3.  **Use Relational Prices**: Always fetch the price from the specific `product_variants` record, falling back to the base product price only if undefined.
+
+---
+
 ## 10. PLUG-AND-PLAY SUMMARY
 
 By standardizing on this relational contract, any PixeoCommerce theme can reliably resolve variants, handle pricing fallbacks, and manage inventory without project-specific customization. AI tools and developers should target the **Relational Framework V2.0** for all new builds.

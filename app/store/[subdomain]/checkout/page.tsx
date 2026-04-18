@@ -385,13 +385,8 @@ function CheckoutContent({ store, subdomain, shippingMethods }: { store: any, su
                             </div>
                           </td>
                           <td className="py-10 px-4 hidden md:table-cell" style={{ verticalAlign: 'top' }}>
-                            <span className="text-[14px] text-gray-500 font-medium capitalize">
-                              {(item as any).variant_selections?.Colour || (item as any).variant_selections?.Color || "—"}
-                            </span>
-                          </td>
-                          <td className="py-10 px-4 hidden md:table-cell" style={{ verticalAlign: 'top' }}>
                              <span className="text-[14px] text-gray-500 font-medium uppercase">
-                              {(item as any).variant_selections?.Size || "—"}
+                              {item.variant_name || "—"}
                             </span>
                           </td>
                           <td className="py-10 px-4 text-center" style={{ verticalAlign: 'top' }}>

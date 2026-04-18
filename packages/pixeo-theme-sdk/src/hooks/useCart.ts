@@ -14,6 +14,8 @@ export interface CartItem {
   image: string;
   quantity: number;
   variant_id?: string;
+  variant_name?: string;
+  variant_selections?: any;
 }
 
 interface CartContextType {

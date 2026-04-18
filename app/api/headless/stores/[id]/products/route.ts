@@ -17,27 +17,26 @@ export async function GET(
   const offset = (page - 1) * limit;
 
   try {
+    // 1. Build the base query
+    // We include product_categories junction table for filtering
     let query = supabase
       .from("products")
-      .select("*", { count: "exact" })
+      .select("*, product_categories(category_id)", { count: "exact" })
       .eq("store_id", storeId)
-      .eq("active", true)
-      .range(offset, offset + limit - 1);
+      .eq("active", true);
 
-    // Filter by category
+    // 2. Filter by category
     if (categoryId) {
-      // Use !inner join to filter by junction table while keeping product-centric result
-      query = query
-        .select("*, product_categories!inner(category_id)")
-        .eq("product_categories.category_id", categoryId);
+      // Support BOTH the legacy category_id column and the new multi-category junction table
+      query = query.or(`category_id.eq.${categoryId},product_categories.category_id.eq.${categoryId}`);
     }
 
-    // Search query
+    // 3. Search query
     if (q) {
       query = query.or(`name.ilike.%${q}%,description.ilike.%${q}%`);
     }
 
-    // Sorting
+    // 4. Sorting
     if (sort === "price_asc") {
       query = query.order("price", { ascending: true });
     } else if (sort === "price_desc") {
@@ -49,9 +48,11 @@ export async function GET(
       query = query.order("created_at", { ascending: false });
     }
 
-    const { data: products, error, count } = await query;
+    // 5. Apply pagination AFTER all filters
+    const { data: products, error, count } = await query.range(offset, offset + limit - 1);
 
     if (error) {
+      console.error("[HEADLESS PRODUCTS ERROR]", error.message);
       return NextResponse.json({ 
         error: { 
           code: "DATABASE_ERROR", 
@@ -70,6 +71,7 @@ export async function GET(
       }
     });
   } catch (err) {
+    console.error("[HEADLESS PRODUCTS CRITICAL ERROR]", err);
     return NextResponse.json({ 
       error: { 
         code: "INTERNAL_SERVER_ERROR", 

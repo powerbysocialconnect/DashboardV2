@@ -16,50 +16,27 @@ export async function GET(
     // 1. Build the deep relational query with explicit field selection
     let query = supabase
       .from("products")
-      .select(`
-        id,
-        name,
-        description,
-        slug,
-        price,
-        compare_at_price,
-        image_urls,
-        stock,
-        active,
-        product_option_groups(
-          id, 
-          name, 
-          position, 
-          product_option_values(id, value)
-        ),
-        product_variants(
-          id, 
-          sku, 
-          price, 
-          compare_at_price, 
-          stock, 
-          image_url, 
-          active, 
-          is_default, 
-          product_variant_options(option_value_id)
-        )
-      `)
+      .select("id,name,description,price,compare_at_price,image_urls,stock,active,product_option_groups(id,name,position,product_option_values(id,value)),product_variants(id,sku,price,compare_at_price,stock,image_url,active,is_default,product_variant_options(option_value_id))")
       .eq("store_id", storeId)
       .eq("active", true);
 
     if (isUuid) {
       query = query.eq("id", productIdOrSlug);
     } else {
-      query = query.eq("slug", productIdOrSlug);
+      // Fallback to name match if slug is missing from DB
+      query = query.eq("name", productIdOrSlug);
     }
 
     const { data: rawProduct, error } = await query.maybeSingle();
 
     if (error) {
+      console.error("[HEADLESS SINGLE PRODUCT ERROR]", error);
       return NextResponse.json({ 
         error: { 
           code: "DATABASE_ERROR", 
-          message: error.message 
+          message: error.message,
+          details: error.details,
+          hint: error.hint
         } 
       }, { status: 400 });
     }
@@ -126,7 +103,15 @@ export async function GET(
 
     // 5. Final Response Object (The Framework Contract)
     const product = {
-      ...rawProduct,
+      id: rawProduct.id,
+      name: rawProduct.name,
+      slug: (rawProduct as any).slug || rawProduct.id,
+      description: rawProduct.description,
+      price: rawProduct.price,
+      compare_at_price: rawProduct.compare_at_price,
+      image_urls: rawProduct.image_urls,
+      stock: rawProduct.stock,
+      active: rawProduct.active,
       has_variants,
       in_stock,
       price_min,

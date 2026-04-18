@@ -21,19 +21,7 @@ export async function GET(
     // We include lightweight variant summaries to derive commerce status without heavy payloads
     let query = supabase
       .from("products")
-      .select(`
-        id, 
-        name, 
-        slug, 
-        description, 
-        price, 
-        compare_at_price, 
-        image_urls, 
-        stock, 
-        active, 
-        product_categories(category_id),
-        product_variants(price, compare_at_price, stock, active)
-      `, { count: "exact" })
+      .select("id,name,description,price,compare_at_price,image_urls,stock,active,product_categories(category_id),product_variants(price,compare_at_price,stock,active)", { count: "exact" })
       .eq("store_id", storeId)
       .eq("active", true);
 
@@ -64,11 +52,13 @@ export async function GET(
     const { data: rawProducts, error, count } = await query.range(offset, offset + limit - 1);
 
     if (error) {
-      console.error("[HEADLESS PRODUCTS ERROR]", error.message);
+      console.error("[HEADLESS PRODUCTS ERROR]", error);
       return NextResponse.json({ 
         error: { 
           code: "DATABASE_ERROR", 
-          message: error.message 
+          message: error.message,
+          details: error.details,
+          hint: error.hint
         } 
       }, { status: 400 });
     }
@@ -96,7 +86,7 @@ export async function GET(
       return {
         id: p.id,
         name: p.name,
-        slug: p.slug,
+        slug: p.slug || p.id,
         description: p.description,
         price: p.price,
         compare_at_price: p.compare_at_price,

@@ -66,25 +66,34 @@ Your storefront must handle products based on the `has_variants` flag.
 
 ### Mode B: Variant Product (`has_variants: true`)
 -   Selectors: **Visible** (Rendered from `product_option_groups`).
--   Pricing: Display `price_min` to `price_max` until a variant is selected.
--   Stock: Use `in_stock` (based on active variants).
+-   Pricing: Display `price_min` to `price_max` until matched.
+-   Stock: Use mode-aware `in_stock` (true if any active variant is in stock).
 -   Buying: Add to cart using `productId` + `variantId`.
 
 ---
 
-## 6. VARIANT RESOLUTION LOGIC (FAST-MATCHING)
+## 6. VARIANT RESOLUTION LOGIC (PLUG-AND-PLAY)
 
-Every variant in the V2.0 contract includes a convenience array: `option_value_ids: string[]`.
+The PixeoCommerce V2.0 contract provides two ways to resolve variants. Storefronts can choose the strategy that fits their architecture best.
 
-### Selection Strategy
-1.  Store user selection in a state: `{ [groupId]: valueId }`.
-2.  Find the variant where its `option_value_ids` array **exactly contains all** selected `valueId`s.
-3.  Update the UI (Price, SKU, Stock) using the matched variant.
+### Strategy A: ID-Based Matching (Recommended for stability)
+Use the `option_value_ids` array for exact matching. This is the most robust method and is unaffected by changing option names.
 
 ```typescript
-const selectedValueIds = Object.values(selections); // ['val_1', 'val_2']
-const matchedVariant = product.product_variants.find(v => 
-  selectedValueIds.every(id => v.option_value_ids.includes(id))
+// selection = { [groupId]: valueId }
+const selectedIds = Object.values(selection);
+const matched = product.product_variants.find(v => 
+  selectedIds.every(id => v.option_value_ids.includes(id))
+);
+```
+
+### Strategy B: String-Based Matching (Fastest for themes)
+Use the `option_values` map. The API provides this pre-computed map containing both the original and normalized (lowercased/trimmed) keys for maximum compatibility.
+
+```typescript
+// selection = { "Size": "Small", "Colour": "Blue" }
+const matched = product.product_variants.find(v => 
+  Object.entries(selection).every(([key, val]) => v.option_values[key] === val)
 );
 ```
 
@@ -103,7 +112,7 @@ The PixeoCommerce backend automatically prunes "dead" option values.
 The Listing API is optimized for speed and returns a lightweight summary payload.
 
 **Listing Fields included by default:**
--   `name`, `slug`, `price`, `compare_at_price`
+-   `name`, `price`, `compare_at_price`
 -   `primary_image` (extracted from `image_urls[0]`)
 -   `has_variants` (Active-only)
 -   `in_stock` (Mode-aware)
@@ -111,7 +120,7 @@ The Listing API is optimized for speed and returns a lightweight summary payload
 
 ---
 
-## 9. EXAMPLE RESPONSE PAYLOAD (VARIANT PRODUCT)
+## 9. EXAMPLE RESPONSE PAYLOAD (ULTRA-COMPATIBLE)
 
 ```json
 {
@@ -125,8 +134,7 @@ The Listing API is optimized for speed and returns a lightweight summary payload
       {
         "name": "Size",
         "product_option_values": [
-          { "id": "val_sm", "value": "Small" },
-          { "id": "val_lg", "value": "Large" }
+          { "id": "val_sm", "value": "small" }
         ]
       }
     ],
@@ -135,6 +143,10 @@ The Listing API is optimized for speed and returns a lightweight summary payload
         "id": "var_1",
         "price": 45.00,
         "stock": 10,
+        "option_values": {
+          "Size": "small",
+          "size": "small"
+        },
         "option_value_ids": ["val_sm"]
       }
     ]

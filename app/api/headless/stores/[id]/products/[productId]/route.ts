@@ -79,18 +79,39 @@ export async function GET(
       .filter((group: any) => group.product_option_values.length > 0)
       .sort((a: any, b: any) => a.position - b.position);
 
-    // 4. Variant Normalization: Inject convenience fields
-    const normalizedVariants = activeVariants.map((v: any) => ({
-      id: v.id,
-      sku: v.sku,
-      price: v.price || rawProduct.price,
-      compare_at_price: v.compare_at_price || rawProduct.compare_at_price,
-      stock: v.stock,
-      image_url: v.image_url,
-      is_default: v.is_default,
-      // Map option_value_ids for instant storefront matching
-      option_value_ids: (v.product_variant_options || []).map((vo: any) => vo.option_value_id)
-    }));
+    // 4. Variant Normalization: Inject convenience mappings for storefronts
+    const normalizedVariants = activeVariants.map((v: any) => {
+      const option_values: Record<string, string> = {};
+      
+      (v.product_variant_options || []).forEach((vo: any) => {
+        const optionValue = vo.product_option_values;
+        if (!optionValue) return;
+
+        // Find the group name for this value
+        const group = (rawProduct.product_option_groups || []).find(
+          (og: any) => og.id === optionValue.option_group_id
+        );
+        
+        if (group) {
+          // Store both original and normalized keys for maximum compatibility
+          option_values[group.name] = optionValue.value;
+          option_values[group.name.toLowerCase().trim()] = optionValue.value;
+        }
+      });
+
+      return {
+        id: v.id,
+        sku: v.sku,
+        price: v.price || rawProduct.price,
+        compare_at_price: v.compare_at_price || rawProduct.compare_at_price,
+        stock: v.stock,
+        image_url: v.image_url,
+        is_default: v.is_default,
+        // Helper fields for instant storefront matching
+        option_values,
+        option_value_ids: (v.product_variant_options || []).map((vo: any) => vo.option_value_id)
+      };
+    });
 
     // Price range calculation
     let price_min = rawProduct.price;

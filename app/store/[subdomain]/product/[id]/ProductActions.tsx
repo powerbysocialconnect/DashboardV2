@@ -8,34 +8,50 @@ import { formatPrice } from '@/lib/currency';
 
 interface ProductActionsProps {
   product: any;
+  selectedVariant?: any;
+  currentPrice: number;
+  isSoldOut: boolean;
   currency: string;
 }
 
-export default function ProductActions({ product, currency }: ProductActionsProps) {
+export default function ProductActions({ 
+  product, 
+  selectedVariant, 
+  currentPrice, 
+  isSoldOut, 
+  currency 
+}: ProductActionsProps) {
   const { addItem } = useCart();
   const { openCart } = useUI();
   const [quantity, setQuantity] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
 
-  const mainImage = product.image_urls?.[0] || product.images?.[0] || 'https://via.placeholder.com/600x800';
-  const isSoldOut = product.stock !== undefined && product.stock <= 0;
+  const mainImage = selectedVariant?.image_url || product.image_urls?.[0] || product.images?.[0] || 'https://via.placeholder.com/600x800';
 
   const handleAddToCart = () => {
     setIsAdding(true);
+    
+    // Construct variant name/options for the cart
+    const variantName = selectedVariant 
+      ? Object.values(selectedVariant.optionValues || {}).join(' / ')
+      : null;
+
     addItem({
-      id: product.id,
+      id: selectedVariant?.id || product.id,
       product_id: product.id,
       name: product.name,
-      price: product.price,
+      variant_name: variantName,
+      price: currentPrice,
       image: mainImage,
-      quantity: quantity
+      quantity: quantity,
+      variant_id: selectedVariant?.id || null
     });
     
     // Smooth transition to show success before opening drawer
     setTimeout(() => {
       setIsAdding(false);
       openCart();
-    }, 500);
+    }, 300);
   };
 
   return (
@@ -70,7 +86,7 @@ export default function ProductActions({ product, currency }: ProductActionsProp
         disabled={isSoldOut || isAdding}
         className="w-full h-12 bg-black text-white text-[13px] font-bold transition-all hover:bg-black/90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed rounded-md px-10"
       >
-        <span>{isAdding ? 'Adding...' : isSoldOut ? 'Sold Out' : `Add to Cart - ${formatPrice(product.price * quantity, currency)} ${currency}`}</span>
+        <span>{isAdding ? 'Adding...' : isSoldOut ? 'Sold Out' : `Add to Cart - ${formatPrice(currentPrice * quantity, currency)} ${currency}`}</span>
       </button>
     </div>
   );

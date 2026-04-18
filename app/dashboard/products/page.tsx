@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Product, Category, Store } from "@/types/database";
+import { hasVariants, resolvePrice, getTotalVariantStock } from "@/lib/commerce/productUtils";
 
 const PAGE_SIZE = 10;
 
@@ -93,7 +94,7 @@ export default function ProductsPage() {
 
       let query = supabase
         .from("products")
-        .select("*, product_categories(categories(name))", { count: "exact" })
+        .select("*, product_categories(categories(name)), product_variants(price, stock)", { count: "exact" })
         .eq("store_id", storeId)
         .order("created_at", { ascending: false })
         .range(from, to);
@@ -323,19 +324,36 @@ export default function ProductsPage() {
                       <TableCell className="font-medium">
                         {product.name}
                       </TableCell>
-                      <TableCell>{formatPrice(product.price)}</TableCell>
                       <TableCell>
-                        <span
-                          className={
-                            product.stock <= 0
-                              ? "text-destructive font-medium"
-                              : product.stock <= 5
-                              ? "text-orange-600 font-medium"
-                              : ""
-                          }
-                        >
-                          {product.stock}
-                        </span>
+                        {hasVariants(product) ? (
+                          <span className="text-xs text-muted-foreground italic">
+                            From {formatPrice(resolvePrice(product, (product as any).product_variants?.find((v: any) => v.is_default) || (product as any).product_variants?.[0]))}
+                          </span>
+                        ) : (
+                          formatPrice(product.price)
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {hasVariants(product) ? (
+                          <div className="flex flex-col">
+                            <span className="font-medium">{getTotalVariantStock(product)}</span>
+                            <span className="text-[10px] text-muted-foreground uppercase opacity-70">
+                              {(product as any).product_variants?.length} Variants
+                            </span>
+                          </div>
+                        ) : (
+                          <span
+                            className={
+                              product.stock <= 0
+                                ? "text-destructive font-medium"
+                                : product.stock <= 5
+                                ? "text-orange-600 font-medium"
+                                : ""
+                            }
+                          >
+                            {product.stock}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
                         {getCategoryNames(product)}

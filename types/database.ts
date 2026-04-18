@@ -180,7 +180,9 @@ export interface Product {
   compare_at_price: number | null;
   image_urls: string[];
   category_id: string | null;
-  variants: ProductVariant[] | null;
+  variants: LegacyProductVariant[] | null;
+  product_variants?: ProductVariant[];
+  product_option_groups?: ProductOptionGroup[];
   stock: number;
   active: boolean;
   stripe_product_id: string | null;
@@ -199,8 +201,8 @@ export interface ProductCategory {
   created_at: string;
 }
 
-export interface ProductVariant {
-  /** Flat variant fields used by the dashboard and storefront */
+export interface LegacyProductVariant {
+  /** Flat variant fields used by the legacy dashboard and storefront */
   id?: string;
   name: string;
   price?: number;
@@ -208,6 +210,43 @@ export interface ProductVariant {
   /** Legacy options-style fields */
   options?: string[];
   prices?: Record<string, number>;
+}
+
+export interface ProductOptionGroup {
+  id: string;
+  product_id: string;
+  name: string;
+  position: number;
+  created_at: string;
+  product_option_values?: ProductOptionValue[];
+}
+
+export interface ProductOptionValue {
+  id: string;
+  option_group_id: string;
+  value: string;
+  created_at: string;
+}
+
+export interface ProductVariant {
+  id: string;
+  product_id: string;
+  sku: string | null;
+  price: number | null;
+  compare_at_price?: number | null;
+  stock: number;
+  image_url: string | null;
+  active: boolean;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+  product_variant_options?: ProductVariantOption[];
+}
+
+export interface ProductVariantOption {
+  variant_id: string;
+  option_value_id: string;
+  product_option_values?: ProductOptionValue;
 }
 
 export interface Order {

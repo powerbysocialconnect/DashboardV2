@@ -1,245 +1,149 @@
-# PixeoCommerce Headless API Documentation (V1.0)
+# PixeoCommerce Headless Framework Blueprint (V2.0)
 
-This documentation defines the **Headless API specification** for PixeoCommerce. Developers building custom storefronts (Next.js, Remix, Mobile Apps) can use these endpoints to interact with the PixeoCommerce backend, fetch product data, and process secure payments via Stripe Connect.
+This document is the official **Commerce Contract** for the PixeoCommerce Headless platform. It defines the technical standards for data fetching, variant resolution, and storefront behavior. Following these standards ensures that your storefront is performant, stable, and "buyable" by default.
 
 ---
 
-## 1. Quick Start & Configuration
+## 1. HEADLESS SYSTEM OVERVIEW
 
-To connect your custom frontend, configure your environment variables with your unique Store ID.
+PixeoCommerce Headless is a **Relational-First Commerce Engine**. It provides a "buyable-only" public contract, meaning the API automatically filters out inactive data and prunes unavailable options before they reach your storefront.
 
-```bash
-NEXT_PUBLIC_PIXEO_API_URL=https://dashboard.pixeocommerce.com
-NEXT_PUBLIC_STORE_ID=your-unique-store-uuid
+---
+
+## 2. CORE PRINCIPLES
+
+1.  **Relational Source of Truth**: All new storefronts must use the `product_option_groups` and `product_variants` arrays.
+2.  **Buyable-Only Contract**: The API only returns `active` variants and sellable options.
+3.  **Dead Option Pruning**: Unavailable or inactive combination paths are stripped at the API level.
+4.  **Backend Normalization**: Complex commerce logic (Price ranges, Stock status) is performed server-side for performance.
+
+---
+
+## 3. REQUIRED STARTER ARCHITECTURE
+
+```text
+/lib/commerce
+  productUtils.ts    <-- Uses product_option_groups & product_variants
+  cartEngine.ts      <-- Matches via option_value_ids
+/components/commerce
+  VariantSelector.ts <-- Renders selectors from API objects
 ```
 
 ---
 
-## 2. Authentication & Security
+## 4. PRODUCT DATA CONTRACT (DETAIL PAGE)
 
-The Headless API is primarily **public** but scoped to a specific `STORE_ID`.
+The Product Detail API returns the full relational contract. **Do not use wildcard selects.**
 
-- **Isolation**: Every request MUST include the `STORE_ID` in the path. Requests are isolated at the database level using Supabase Row-Level Security (RLS).
-- **Public Endpoints**: Catalog and Store info endpoints are publicly accessible.
-- **Security**: Never expose Stripe Secret Keys or Supabase Service Role keys in your frontend code.
-- **CORS**: Headless storefronts are allowed from any domain. You can restrict this in your Store Dashboard under **Settings > Domains**.
+### Mandatory Fields
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `id` | UUID | Unique product ID. |
+| `has_variants` | Boolean | `true` if 1+ **active** variants exist. |
+| `in_stock` | Boolean | Mode-aware (Variant stock OR Base stock). |
+| `price_min` | Number | Lowest active variant price. |
+| `price_max` | Number | Highest active variant price. |
+| `product_option_groups` | Array | Pruned list of available choices. |
+| `product_variants` | Array | List of active, sellable SKUs. |
+
+### [DEPRECATED] JSON Fields
+The following fields are legacy and **should not be used** in new builds:
+-   `colors`
+-   `sizes`
+-   `variants` (JSON column)
 
 ---
 
-## 3. Store Identity & Branding
+## 5. SIMPLE VS VARIANT MODE RESOLUTION
 
-### Get Store Info
-Fetches core store details, currency, and branding/theme configuration.
+Your storefront must handle products based on the `has_variants` flag.
 
-- **Endpoint**: `GET /api/headless/stores/[STORE_ID]`
-- **Response**:
-```json
-{
-  "store": {
-    "id": "uuid",
-    "name": "Acme Boutique",
-    "subdomain": "acme",
-    "description": "High-end fashion",
-    "logo_url": "https://...",
-    "currency": "USD",
-    "branding": {
-      "primaryColor": "#000000",
-      "accentColor": "#6366f1"
-    },
-    "status": "live"
-  },
-  "themeConfig": {
-    "theme_settings": {
-      "headingFont": "Inter",
-      "bodyFont": "Inter",
-      "buttonStyle": "pill"
-    },
-    "homepage_layout": [...]
-  }
-}
+### Mode A: Simple Product (`has_variants: false`)
+-   Selectors: **Hidden**.
+-   Pricing: Use `price`.
+-   Stock: Use `in_stock` (based on base product).
+-   Buying: Add to cart directly using `productId`.
+
+### Mode B: Variant Product (`has_variants: true`)
+-   Selectors: **Visible** (Rendered from `product_option_groups`).
+-   Pricing: Display `price_min` to `price_max` until a variant is selected.
+-   Stock: Use `in_stock` (based on active variants).
+-   Buying: Add to cart using `productId` + `variantId`.
+
+---
+
+## 6. VARIANT RESOLUTION LOGIC (FAST-MATCHING)
+
+Every variant in the V2.0 contract includes a convenience array: `option_value_ids: string[]`.
+
+### Selection Strategy
+1.  Store user selection in a state: `{ [groupId]: valueId }`.
+2.  Find the variant where its `option_value_ids` array **exactly contains all** selected `valueId`s.
+3.  Update the UI (Price, SKU, Stock) using the matched variant.
+
+```typescript
+const selectedValueIds = Object.values(selections); // ['val_1', 'val_2']
+const matchedVariant = product.product_variants.find(v => 
+  selectedValueIds.every(id => v.option_value_ids.includes(id))
+);
 ```
 
 ---
 
-## 4. Product Catalog
+## 7. DEAD OPTION PRUNING
 
-### List Products
-Fetches a list of active products with support for filtering, search, and pagination.
+The PixeoCommerce backend automatically prunes "dead" option values.
+*   If you have a "Red" shirt but all Red variants are **Inactive**, the "Red" choice will NOT appear in the `product_option_groups` payload.
+*   This ensures the storefront only ever displays buyable paths, preventing "404 - Not Found" errors during selection.
 
-- **Endpoint**: `GET /api/headless/stores/[STORE_ID]/products`
-- **Params**:
-  - `q`: Search query (searches name and description).
-  - `category_id`: Filter products by category UUID.
-  - `sort`: `latest` (default), `oldest`, `price_asc`, `price_desc`.
-  - `page`: Page number for pagination.
-  - `limit`: Results per page (default: 100).
+---
 
-### Get Single Product
-Fetches full details for a product by its ID or Slug.
+## 8. PRODUCT LIST / CATEGORY RESPONSES
 
-- **Endpoint**: `GET /api/headless/stores/[STORE_ID]/products/[id_or_slug]`
-- **Response**:
+The Listing API is optimized for speed and returns a lightweight summary payload.
+
+**Listing Fields included by default:**
+-   `name`, `slug`, `price`, `compare_at_price`
+-   `primary_image` (extracted from `image_urls[0]`)
+-   `has_variants` (Active-only)
+-   `in_stock` (Mode-aware)
+-   `price_min`, `price_max`
+
+---
+
+## 9. EXAMPLE RESPONSE PAYLOAD (VARIANT PRODUCT)
+
 ```json
 {
   "product": {
-    "id": "uuid",
-    "name": "Classic T-Shirt",
-    "slug": "classic-t-shirt",
-    "description": "100% Cotton...",
-    "price": 25.00,
-    "compare_at_price": 35.00,
-    "image_urls": ["url1", "url2"],
-    "stock": 50,
-    "variants": [
+    "name": "NudeTone Performance Set",
+    "has_variants": true,
+    "in_stock": true,
+    "price_min": 45.00,
+    "price_max": 55.00,
+    "product_option_groups": [
       {
-        "id": "var_uuid",
-        "name": "Large / Black",
-        "price": 25.00,
-        "stock": 10
+        "name": "Size",
+        "product_option_values": [
+          { "id": "val_sm", "value": "Small" },
+          { "id": "val_lg", "value": "Large" }
+        ]
       }
     ],
-    "active": true
+    "product_variants": [
+      {
+        "id": "var_1",
+        "price": 45.00,
+        "stock": 10,
+        "option_value_ids": ["val_sm"]
+      }
+    ]
   }
 }
 ```
 
 ---
 
-## 5. Categories
+## 10. PLUG-AND-PLAY SUMMARY
 
-### Get All Categories
-Fetches all active categories for the store.
-
-- **Endpoint**: `GET /api/headless/stores/[STORE_ID]/categories`
-- **Response**:
-```json
-{
-  "categories": [
-    { 
-      "id": "uuid", 
-      "name": "Apparel", 
-      "slug": "apparel",
-      "image_url": "https://..."
-    }
-  ]
-}
-```
-
----
-
-## 6. Cart Architecture & Inventory
-
-PixeoCommerce follows a **Frontend-Managed Cart** architecture.
-
-- **State Management**: The frontend is responsible for maintaining the cart state (usually in `localStorage` or `Redux/Zustand`).
-- **Inventory Validation**: The backend does **not** persist a "cart" object. Instead, product availability and pricing are re-validated server-side at the moment of checkout creation.
-- **Inventory Rules**:
-  - If a product or variant has `stock: 0`, it is treated as "Sold Out".
-  - The Checkout API will reject requests if the requested quantity exceeds the current stock.
-
----
-
-## 7. Checkout Flow (Stripe Connect)
-
-PixeoCommerce uses **Stripe Connect** to route payments directly to the merchant's account.
-
-1. **Frontend**: POSTs the cart items to `/checkout`.
-2. **Backend**: 
-    - Validates product existence and stock.
-    - Resolves variant pricing.
-    - Applies discounts.
-    - Creates a Stripe Checkout Session via the merchant's connected account.
-3. **Response**: Returns a secure `url` for redirection.
-4. **Lifecycle**: Payment completion triggers a Stripe Webhook that creates the official Order in the PixeoCommerce dashboard.
-
-### Create Checkout Session
-- **Endpoint**: `POST /api/headless/stores/[STORE_ID]/checkout`
-- **Body**:
-```json
-{
-  "items": [
-    { "productId": "uuid", "variantId": "opt_uuid", "quantity": 1 }
-  ],
-  "discount_code": "SUMMER10",
-  "shipping_rate_id": "uuid",
-  "success_url": "https://yoursite.com/success",
-  "cancel_url": "https://yoursite.com/cart",
-  "customer_details": {
-    "email": "customer@example.com",
-    "firstName": "John",
-    "lastName": "Doe"
-  }
-}
-```
-- **Response**: `{ "url": "https://checkout.stripe.com/..." }`
-
----
-
-## 8. Error Handling System
-
-All API errors return a standard 4xx or 5xx status code with a consistent JSON body:
-
-```json
-{
-  "error": {
-    "code": "ERROR_CODE_STRING",
-    "message": "Human readable description"
-  }
-}
-```
-
-| Code | Description |
-| :--- | :--- |
-| `STORE_NOT_FOUND` | The provided Store ID is invalid. |
-| `PRODUCT_NOT_FOUND` | One of the items in the cart no longer exists. |
-| `OUT_OF_STOCK` | Requested quantity exceeds current stock. |
-| `INVALID_DISCOUNT_CODE` | The discount code is invalid or expired. |
-| `INTERNAL_SERVER_ERROR` | An unexpected error occurred on our end. |
-
----
-
-## 9. Performance & Caching (Vercel/Next.js)
-
-For building high-performance storefronts, we recommend:
-
-- **Static Generation (SSG/ISR)**: Use `getStaticProps` or `generateStaticParams` for Product and Category pages. Suggested `revalidate` period: **60 seconds**.
-- **Dynamic Fetching**: Use client-side fetching for `Discounts` and `Shipping Methods` to ensure real-time accuracy.
-- **Global Edge Caching**: PixeoCommerce API responses include `Cache-Control` headers for shared product lists.
-
----
-
-## 10. API Versioning
-
-- **Current Version**: `v1`
-- **Strategy**: We ensure no breaking changes to the `v1` path. Future breaking changes will be introduced via `v2`.
-
----
-
-## 11. Minimal Working Example (Frontend)
-
-```typescript
-async function handleCheckout(cartItems) {
-  const response = await fetch(`/api/headless/stores/${STORE_ID}/checkout`, {
-    method: 'POST',
-    body: JSON.stringify({
-      items: cartItems.map(item => ({
-        productId: item.id,
-        variantId: item.variant_id,
-        quantity: item.quantity
-      })),
-      success_url: window.location.origin + '/thanks',
-      cancel_url: window.location.origin + '/cart'
-    })
-  });
-
-  const { url, error } = await response.json();
-  
-  if (error) {
-    alert(error.message);
-    return;
-  }
-
-  // Redirect to Stripe
-  window.location.href = url;
-}
-```
+By standardizing on this relational contract, any PixeoCommerce theme can reliably resolve variants, handle pricing fallbacks, and manage inventory without project-specific customization. AI tools and developers should target the **Relational Framework V2.0** for all new builds.

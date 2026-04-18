@@ -39,7 +39,7 @@ export async function resolveStorefront(
   const [productsRes, categoriesRes, headerPagesRes, footerPagesRes] = await Promise.all([
     supabase
       .from("products")
-      .select("*")
+      .select("*, product_categories(category_id)")
       .eq("store_id", config.store.id)
       .eq("active", true)
       .order("created_at", { ascending: false })

@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import Link from 'next/link';
 import { formatPrice } from '@/lib/currency';
 
 interface ProductCardProps {
@@ -14,7 +15,7 @@ function ProductCard({ product, currency, subdomain = "" }: ProductCardProps) {
   const isSoldOut = product.stock !== undefined && product.stock <= 0;
 
   return (
-    <a href={subdomain ? `/store/${subdomain}/product/${product.id}` : `/product/${product.id}`} className="group block cursor-pointer">
+    <Link href={subdomain ? `/store/${subdomain}/product/${product.id}` : `/product/${product.id}`} className="group block cursor-pointer">
       <div className="relative w-full overflow-hidden rounded-[20px] bg-white transition-all duration-500 group-hover:shadow-xl">
         <img 
           src={mainImage} 
@@ -37,7 +38,7 @@ function ProductCard({ product, currency, subdomain = "" }: ProductCardProps) {
           {formatPrice(product.price, currency)}
         </p>
       </div>
-    </a>
+    </Link>
   );
 }
 
@@ -65,7 +66,18 @@ export function FeaturedProducts({
       .map((id: string) => byId.get(id))
       .filter(Boolean) as any[];
   } else if (sourceType === "category" && categoryId) {
-    filteredProducts = products.filter((p: any) => p.category_id === categoryId);
+    filteredProducts = products.filter((p: any) => {
+      // Check legacy single category_id
+      if (p.category_id === categoryId) return true;
+      
+      // Check multi-category junction data
+      const pc = p.product_categories;
+      if (Array.isArray(pc)) {
+        return pc.some((link: any) => link.category_id === categoryId);
+      }
+      
+      return false;
+    });
   }
 
   const sortedProducts = [...filteredProducts];
@@ -100,12 +112,12 @@ export function FeaturedProducts({
           <div className="h-1 w-20 bg-black" />
         </div>
         {ctaLabel && (
-          <a 
+          <Link 
             href={ctaLink}
             className="text-[12px] font-bold uppercase tracking-[0.2em] border-b-2 border-black pb-1 hover:opacity-50 transition-opacity"
           >
             {ctaLabel}
-          </a>
+          </Link>
         )}
       </div>
 

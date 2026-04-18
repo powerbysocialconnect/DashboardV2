@@ -144,7 +144,14 @@ function FieldInput({
       const selectedCategoryId = (contextValues.categoryId as string | undefined) || undefined;
 
       const availableProducts = selectedCategoryId
-        ? products.filter((p) => p.category_id === selectedCategoryId)
+        ? products.filter((p) => {
+            if (p.category_id === selectedCategoryId) return true;
+            const pcArr = (p as any).product_categories;
+            if (Array.isArray(pcArr)) {
+              return pcArr.some((link: any) => link.category_id === selectedCategoryId);
+            }
+            return false;
+          })
         : products;
 
       const selectedProducts = selectedIds

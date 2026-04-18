@@ -26,7 +26,10 @@ export async function GET(
 
     // Filter by category
     if (categoryId) {
-      query = query.eq("category_id", categoryId);
+      // Use !inner join to filter by junction table while keeping product-centric result
+      query = query
+        .select("*, product_categories!inner(category_id)")
+        .eq("product_categories.category_id", categoryId);
     }
 
     // Search query

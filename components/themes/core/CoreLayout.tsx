@@ -6,6 +6,7 @@ import {
   Instagram, Facebook, Youtube, Twitter, Music, ExternalLink,
   Ticket
 } from 'lucide-react';
+import Link from 'next/link';
 import { cn } from "@/lib/utils";
 import {
   STOREFRONT_LOGO_FOOTER_CLASSES,
@@ -100,11 +101,11 @@ export function CartDrawer({
                     <div className="flex-1 flex flex-col justify-between py-1">
                       <div>
                         <div className="flex justify-between items-start">
-                          <a href={subdomain ? `/store/${subdomain}/product/${item.id}` : `/product/${item.id}`} className="block group">
+                          <Link href={subdomain ? `/store/${subdomain}/product/${item.id}` : `/product/${item.id}`} onClick={closeCart} className="block group">
                              <h4 className="text-[12px] font-bold text-black uppercase tracking-tight pr-4 group-hover:text-gray-500 transition-colors">
                                {item.name}
                              </h4>
-                          </a>
+                          </Link>
                           <span className="text-[12px] font-bold text-black tabular-nums">{formatPrice(item.price * item.quantity, currency)}</span>
                         </div>
                         <p className="text-[11px] text-gray-500 mt-1">One Size / Default</p>
@@ -275,34 +276,47 @@ export function SearchOverlay({
         {/* Input Area */}
         <div className="flex-1 overflow-y-auto px-6 pb-20">
            <div className="max-w-4xl mx-auto w-full pt-[5%] md:pt-[8%]">
-             <div className="w-full relative">
-               <input 
-                 autoFocus={isSearchOpen}
-                 type="text" 
-                 placeholder="TYPE TO SEARCH..." 
-                 className="w-full bg-transparent border-none text-3xl md:text-8xl font-black tracking-tighter uppercase placeholder:text-black/20 focus:outline-none focus:ring-0 py-8"
-                 style={{ 
-                   WebkitTextStroke: '1px black',
-                   WebkitTextFillColor: 'transparent',
-                   color: 'transparent'
-                 }}
-                 value={query}
-                 onChange={(e) => setQuery(e.target.value)}
-               />
-               <div className="h-[2px] w-full bg-black/[0.1] relative">
-                  <div 
-                    className="absolute inset-y-0 left-0 bg-black transition-transform duration-700 ease-out"
-                    style={{ transform: `scaleX(${query ? 1 : 0})`, transformOrigin: 'left' }}
-                  />
-               </div>
-             </div>
+              <div className="w-full relative group">
+                <input 
+                  autoFocus={isSearchOpen}
+                  type="text" 
+                  placeholder="TYPE TO SEARCH..." 
+                  className="w-full bg-transparent border-none text-3xl md:text-8xl font-black tracking-tighter uppercase placeholder:text-black/20 focus:outline-none focus:ring-0 py-8 pr-12"
+                  style={{ 
+                    WebkitTextStroke: '1px black',
+                    WebkitTextFillColor: 'transparent',
+                    color: 'transparent'
+                  }}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+                
+                {/* Custom Blinking Typing Line - Only show when query is empty */}
+                <span 
+                  className={cn(
+                    "absolute top-1/2 -translate-y-1/2 h-12 md:h-24 w-[2px] md:w-[4px] bg-black pointer-events-none",
+                    query ? "hidden" : "inline-block animate-blink"
+                  )}
+                  style={{ 
+                    left: '0',
+                    marginLeft: '2px'
+                  }}
+                />
+
+                <div className="h-[2px] w-full bg-black/[0.1] relative">
+                   <div 
+                     className="absolute inset-y-0 left-0 bg-black transition-transform duration-700 ease-out"
+                     style={{ transform: `scaleX(${query ? 1 : 0})`, transformOrigin: 'left' }}
+                   />
+                </div>
+              </div>
 
              {/* Results Preview */}
              <div className="w-full mt-16 md:mt-24">
                {query.length > 1 && filteredProducts.length > 0 ? (
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
                    {filteredProducts.map((product) => (
-                     <a 
+                     <Link 
                        key={product.id} 
                        href={subdomain ? `/store/${subdomain}/product/${product.id}` : `/product/${product.id}`}
                        onClick={closeSearch}
@@ -321,7 +335,7 @@ export function SearchOverlay({
                             {formatPrice(product.price, currency)}
                          </p>
                        </div>
-                     </a>
+                     </Link>
                    ))}
                  </div>
                ) : query.length > 1 ? (
@@ -417,13 +431,14 @@ export function NavSidebar({
 
           <nav className="flex-1 space-y-8">
             {navLinks.map((link) => (
-              <a 
+              <Link 
                 key={link.name} 
                 href={link.href}
+                onClick={closeSidebar}
                 className="block text-2xl md:text-3xl font-bold tracking-tight uppercase hover:translate-x-2 transition-transform duration-300"
               >
                 {link.name}
-              </a>
+              </Link>
             ))}
             <button 
               onClick={() => { closeSidebar(); toggleSearch(); }}
@@ -503,7 +518,7 @@ export function CoreHeader({
           </button>
         </div>
         <div className="flex min-w-0 justify-center items-center px-1 sm:px-2">
-          <a href={subdomain ? `/store/${subdomain}` : '/'} className="flex max-w-full items-center justify-center transition-transform active:scale-95">
+          <Link href={subdomain ? `/store/${subdomain}` : '/'} className="flex max-w-full items-center justify-center transition-transform active:scale-95">
             {logoUrl ? <img src={logoUrl} alt={storeName} className={STOREFRONT_LOGO_HEADER_CLASSES} /> 
             : <span 
                 className="text-lg md:text-2xl font-black tracking-[0.3em] uppercase whitespace-nowrap"
@@ -515,7 +530,7 @@ export function CoreHeader({
               >
                 {storeName}
               </span>}
-          </a>
+          </Link>
         </div>
         <div className="flex justify-end items-center space-x-2 md:space-x-6">
           <button onClick={toggleSearch} className="p-2 hover:opacity-40 transition-opacity">

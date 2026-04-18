@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import Link from 'next/link';
 import { CoreLayout } from './core/CoreLayout';
 import { formatPrice } from '@/lib/currency';
 import { ThemeSectionRenderer } from './sections/SectionRenderer';
@@ -23,12 +24,16 @@ export interface ThemeClasses {
 /**
  * PRODUCT CARD
  */
-function ProductCard({ product, currency, subdomain = "" }: { product: any, currency: string, subdomain?: string }) {
+function ProductCard({ product, currency, subdomain = "" }: { product: any; currency: string; subdomain?: string }) {
   const mainImage = product.image_urls?.[0] || product.images?.[0] || 'https://via.placeholder.com/600x800?text=No+Image';
   const isSoldOut = product.stock !== undefined && product.stock <= 0;
 
+  const productHref = subdomain 
+    ? `/store/${subdomain}/product/${product.id}` 
+    : `/product/${product.id}`;
+
   return (
-    <a href={subdomain ? `/store/${subdomain}/product/${product.id}` : `/product/${product.id}`} className="group block cursor-pointer">
+    <Link href={productHref} className="group block cursor-pointer">
       <div className="relative w-full overflow-hidden rounded-[20px] bg-white transition-all duration-500 group-hover:shadow-xl">
         <img 
           src={mainImage} 
@@ -51,7 +56,7 @@ function ProductCard({ product, currency, subdomain = "" }: { product: any, curr
           {formatPrice(product.price, currency)}
         </p>
       </div>
-    </a>
+    </Link>
   );
 }
 

@@ -57,7 +57,7 @@ export default async function CollectionPage({
       .from("categories")
       .select("id")
       .eq("store_id", store.id)
-      .eq("slug", params.collection)
+      .ilike("slug", params.collection)
       .single();
 
     if (category) {
@@ -72,7 +72,7 @@ export default async function CollectionPage({
     // we use a simpler select if collection is "all"
     query = supabase
       .from("products")
-      .select("*", { count: "exact" })
+      .select("*, product_categories(category_id)", { count: "exact" })
       .eq("store_id", store.id)
       .eq("active", true)
       .order("created_at", { ascending: false });
@@ -89,7 +89,7 @@ export default async function CollectionPage({
     const { data: cat } = await supabase
       .from("categories")
       .select("name")
-      .eq("slug", params.collection)
+      .ilike("slug", params.collection)
       .single();
     if (cat) collectionTitle = cat.name;
   }
